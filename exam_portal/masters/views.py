@@ -1154,8 +1154,7 @@ def coursereg_upload(request):
             messages.error(
                 request,
                 "CSV header mismatch. Expected: "
-                f"{', '.join(expected_fields)}. "
-                f"Found: {', '.join(reader.fieldnames or [])}",
+                f"{', '.join(expected_fields)}. ",
             )
             return redirect(request.META.get("HTTP_REFERER", "/"))
         # --- Pass 1: basic row validation, gather ids for bulk fetch ---

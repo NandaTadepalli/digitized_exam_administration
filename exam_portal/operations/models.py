@@ -100,7 +100,7 @@ class ExamSlot(models.Model):
             models.Index(fields=["exam_date", "slot_code"]),
         ]
         constraints = [
-            models.UniqueConstraint(fields=["exam_date", "start_time", "end_time", "slot_code"], name="uq_exam_slot_time"),
+            models.UniqueConstraint(fields=["exam_date", "start_time", "end_time", "slot_code", "exam_type", "mode"], name="uq_exam_slot_time"),
         ]
 
 
@@ -134,7 +134,7 @@ class StudentExamMap(models.Model):
 
 
 class RoomAllocation(models.Model):
-    exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name="room_allocations")
+    exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name="room_allocations", null=True)
     room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="exam_allocations")
 
     class Meta:

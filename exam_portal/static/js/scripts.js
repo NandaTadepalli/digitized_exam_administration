@@ -1,194 +1,411 @@
+// ========== Room Allocation: Dynamic Allocated Capacity ========== 
 document.addEventListener('DOMContentLoaded', function () {
-    // --- Course Registration Search, Autocomplete, Table, Print, Download, Pagination ---
-    let courseregStudentIdList = [];
-    function courseregFetchStudentIdAutocomplete(query) {
-        fetch(`/masters/ajax/?type=student-id-autocomplete&q=${encodeURIComponent(query)}`)
-            .then(resp => resp.json())
-            .then(data => {
-                courseregStudentIdList = (data.results || []).map(item => `${item.id} - ${item.name}`);
-                // Sort suggestions by ID (smallest to largest)
-                courseregStudentIdList.sort((a, b) => {
-                    const idA = a.split(' - ')[0];
-                    const idB = b.split(' - ')[0];
-                    // Numeric sort if IDs are numbers, otherwise string sort
-                    if (!isNaN(idA) && !isNaN(idB)) {
-                        return Number(idA) - Number(idB);
+            // Helper to show popup message at top right
+            function showPopupMessage(text, type) {
+                let popup = document.getElementById('popup-messages');
+                if (!popup) {
+                    popup = document.createElement('div');
+                    popup.id = 'popup-messages';
+                    popup.style.position = 'fixed';
+                    popup.style.top = '20px';
+                    popup.style.right = '30px';
+                    popup.style.zIndex = '9999';
+                    document.body.appendChild(popup);
+                }
+                let msgDiv = document.createElement('div');
+                msgDiv.className = 'popup-message popup-' + (type || 'error');
+                msgDiv.tabIndex = 0;
+                msgDiv.innerHTML = text;
+                popup.appendChild(msgDiv);
+                // Dismiss only when clicking outside
+                function dismissPopup(e) {
+                    if (!popup.contains(e.target)) {
+                        popup.remove();
+                        document.removeEventListener('mousedown', dismissPopup);
                     }
-                    return idA.localeCompare(idB);
-                });
-                courseregShowAutocompleteList(courseregStudentIdList, query);
+                }
+                document.addEventListener('mousedown', dismissPopup);
+            }
+        // Prevent allocation if cap not reached
+        var allocationForm = document.querySelector('.rooms-table-section form');
+        if (allocationForm) {
+            allocationForm.addEventListener('submit', function(e) {
+                let required = parseInt(requiredCap.textContent) || 0;
+                let allocated = parseInt(allocatedCap.textContent) || 0;
+                if (allocated < required) {
+                    e.preventDefault();
+                    showPopupMessage('Cannot allocate: Allocated capacity is less than required.<br>Please select more rooms to meet the required capacity.', 'error');
+                }
             });
+        }
+    var requiredCap = document.getElementById('required-capacity-display');
+    var allocatedCap = document.getElementById('allocated-capacity-display');
+    var roomCheckboxes = document.querySelectorAll('input[name="selected_rooms"]');
+    var errorMsg = null;
+    var clearBtn = document.getElementById('clear-room-selection');
+    // Create error message element if not exists
+    if (!document.getElementById('room-capacity-error')) {
+        errorMsg = document.createElement('div');
+        errorMsg.id = 'room-capacity-error';
+        errorMsg.style.color = 'red';
+        errorMsg.style.margin = '10px 0';
+        errorMsg.style.display = 'none';
+        var summaryWrapper = document.querySelector('.room-capacity-summary-wrapper');
+        if (summaryWrapper) summaryWrapper.appendChild(errorMsg);
+    } else {
+        errorMsg = document.getElementById('room-capacity-error');
     }
-    function courseregShowAutocompleteList(arr, query) {
-        const inp = document.getElementById('studentSearch');
-        const list = document.getElementById('autocomplete-list');
-        courseregCloseAllLists();
-        if (!inp || !inp.value || !list) return false;
-        list.innerHTML = '';
-        arr.forEach(item => {
-            if (item.toLowerCase().includes(query.toLowerCase())) {
-                let div = document.createElement('div');
-                div.innerHTML = item;
-                div.className = 'autocomplete-item';
-                div.tabIndex = 0;
-                div.addEventListener('click', function () {
-                    inp.value = item; // Fill input with full suggestion text
-                    courseregCloseAllLists();
+    if (requiredCap && allocatedCap && roomCheckboxes.length > 0) {
+                if (clearBtn && roomCheckboxes.length > 0) {
+                    clearBtn.addEventListener('click', function() {
+                        roomCheckboxes.forEach(function(cb) {
+                            cb.checked = false;
+                            cb.disabled = false;
+                        });
+                        if (errorMsg) errorMsg.style.display = 'none';
+                        updateAllocatedCapacity();
+                    });
+                }
+        function updateAllocatedCapacity() {
+            let total = 0;
+            roomCheckboxes.forEach(function(cb) {
+                if (cb.checked) {
+                    total += parseInt(cb.getAttribute('data-capacity')) || 0;
+                }
+            });
+            allocatedCap.textContent = total;
+            // Hide error if under required
+            if (errorMsg) errorMsg.style.display = 'none';
+        }
+        updateAllocatedCapacity();
+        roomCheckboxes.forEach(function(cb) {
+            cb.addEventListener('change', function(e) {
+                let total = 0;
+                roomCheckboxes.forEach(function(box) {
+                    if (box.checked) {
+                        total += parseInt(box.getAttribute('data-capacity')) || 0;
+                    }
                 });
-                list.appendChild(div);
+                let required = parseInt(requiredCap.textContent) || 0;
+                // Find minimum capacity among unchecked rooms
+                let minCap = Infinity;
+                roomCheckboxes.forEach(function(box) {
+                    if (!box.checked) {
+                        let cap = parseInt(box.getAttribute('data-capacity')) || 0;
+                        if (cap < minCap) minCap = cap;
+                    }
+                });
+                if (total >= required) {
+                    // Allow this selection, but disable further selection
+                    if (errorMsg) {
+                        errorMsg.textContent = 'Required capacity attained or exceeded. Cannot select more rooms.';
+                        errorMsg.style.display = 'block';
+                    }
+                    roomCheckboxes.forEach(function(box) {
+                        if (!box.checked) box.disabled = true;
+                    });
+                } else {
+                    // Border condition: only allow min cap room if next selection would meet/exceed required and difference is less than 40
+                    let remaining = required - total;
+                    let minCapRooms = [];
+                    roomCheckboxes.forEach(function(box) {
+                        if (!box.checked) {
+                            let cap = parseInt(box.getAttribute('data-capacity')) || 0;
+                            if (cap === minCap) minCapRooms.push(box);
+                        }
+                    });
+                    let restrictToMin = false;
+                    if (remaining < 40) {
+                        roomCheckboxes.forEach(function(box) {
+                            if (!box.checked) {
+                                let cap = parseInt(box.getAttribute('data-capacity')) || 0;
+                                if (cap >= remaining) restrictToMin = true;
+                            }
+                        });
+                    }
+                    roomCheckboxes.forEach(function(box) {
+                        if (!box.checked) {
+                            let cap = parseInt(box.getAttribute('data-capacity')) || 0;
+                            if (restrictToMin) {
+                                if (cap === minCap) {
+                                    box.disabled = false;
+                                } else {
+                                    box.disabled = true;
+                                }
+                            } else {
+                                box.disabled = false;
+                            }
+                        }
+                    });
+                    if (errorMsg) errorMsg.style.display = 'none';
+                }
+                updateAllocatedCapacity();
+            });
+        });
+    }
+});
+// ========== Faculty Allocation: Dynamic Allocated Faculty ========== 
+document.addEventListener('DOMContentLoaded', function () {
+    var allocationForm = document.querySelector('.faculty-assigned form');
+    var requiredFac = document.getElementById('required-faculty-display');
+    var allocatedFac = document.getElementById('allocated-faculty-display');
+    var facultyCheckboxes = document.querySelectorAll('input[name="selected_faculty"]');
+    function showPopupMessage(text, type) {
+        let popup = document.getElementById('popup-messages');
+        if (!popup) {
+            popup = document.createElement('div');
+            popup.id = 'popup-messages';
+            popup.style.position = 'fixed';
+            popup.style.top = '20px';
+            popup.style.right = '30px';
+            popup.style.zIndex = '9999';
+            document.body.appendChild(popup);
+        }
+        let msgDiv = document.createElement('div');
+        msgDiv.className = 'popup-message popup-' + (type || 'error');
+        msgDiv.tabIndex = 0;
+        msgDiv.innerHTML = text;
+        popup.appendChild(msgDiv);
+        // Dismiss only when clicking outside
+        function dismissPopup(e) {
+            if (!popup.contains(e.target)) {
+                popup.remove();
+                document.removeEventListener('mousedown', dismissPopup);
+            }
+        }
+        document.addEventListener('mousedown', dismissPopup);
+    }
+    function updateAllocatedFaculty() {
+        let count = 0;
+        facultyCheckboxes.forEach(function(cb) {
+            if (cb.checked) count++;
+        });
+        allocatedFac.textContent = count;
+        // Only disable further selection if cap reached
+        if (count < parseInt(requiredFac.textContent)) {
+            facultyCheckboxes.forEach(function(cb) {
+                cb.disabled = false;
+            });
+        } else {
+            facultyCheckboxes.forEach(function(cb) {
+                if (!cb.checked) cb.disabled = true;
+            });
+        }
+    }
+    if (allocationForm) {
+        allocationForm.addEventListener('submit', function(e) {
+            let required = parseInt(requiredFac.textContent) || 0;
+            let allocated = parseInt(allocatedFac.textContent) || 0;
+            if (allocated !== required) {
+                e.preventDefault();
+                showPopupMessage('Cannot assign: Allocated faculty is less than required.<br>Please select more faculty to meet the required count.', 'error');
             }
         });
-        if (list && list.children.length > 0) {
-            list.style.display = 'block';
-            let currentFocus = -1;
-            inp.onkeydown = function (e) {
-                let items = list.getElementsByClassName('autocomplete-item');
-                if (!items.length) return;
-                if (e.key === 'ArrowDown') {
-                    currentFocus++;
-                    if (currentFocus >= items.length) currentFocus = 0;
-                    setActive(items, currentFocus);
-                } else if (e.key === 'ArrowUp') {
-                    currentFocus--;
-                    if (currentFocus < 0) currentFocus = items.length - 1;
-                    setActive(items, currentFocus);
-                } else if (e.key === 'Enter') {
-                    e.preventDefault();
-                    if (currentFocus > -1) {
-                        items[currentFocus].click();
-                    }
-                }
-            };
-            function setActive(items, idx) {
-                for (let i = 0; i < items.length; i++) {
-                    items[i].classList.remove('active');
-                }
-                if (items[idx]) {
-                    items[idx].classList.add('active');
-                    items[idx].scrollIntoView({ block: 'nearest' });
-                }
-            }
-        } else {
-            list.style.display = 'none';
-        }
     }
-    function courseregCloseAllLists() {
-        const list = document.getElementById('autocomplete-list');
-        if (list) {
-            list.innerHTML = '';
-            list.style.display = 'none';
-        }
+    facultyCheckboxes.forEach(function(cb) {
+        cb.addEventListener('change', updateAllocatedFaculty);
+    });
+    updateAllocatedFaculty();
+    var clearBtn = document.getElementById('clear-faculty-selection');
+    if (clearBtn && facultyCheckboxes.length > 0) {
+        clearBtn.addEventListener('click', function() {
+            facultyCheckboxes.forEach(function(cb) {
+                cb.checked = false;
+                cb.disabled = false;
+            });
+            updateAllocatedFaculty();
+        });
     }
-    document.addEventListener('mousedown', function (e) {
-        const list = document.getElementById('autocomplete-list');
-        if (list && !list.contains(e.target) && e.target.id !== 'studentSearch') {
-            courseregCloseAllLists();
+});
+// --- Course Registration Search, Autocomplete, Table, Print, Download, Pagination ---
+let courseregStudentIdList = [];
+function courseregFetchStudentIdAutocomplete(query) {
+    fetch(`/masters/ajax/?type=student-id-autocomplete&q=${encodeURIComponent(query)}`)
+        .then(resp => resp.json())
+        .then(data => {
+            courseregStudentIdList = (data.results || []).map(item => `${item.id} - ${item.name}`);
+            // Sort suggestions by ID (smallest to largest)
+            courseregStudentIdList.sort((a, b) => {
+                const idA = a.split(' - ')[0];
+                const idB = b.split(' - ')[0];
+                // Numeric sort if IDs are numbers, otherwise string sort
+                if (!isNaN(idA) && !isNaN(idB)) {
+                    return Number(idA) - Number(idB);
+                }
+                return idA.localeCompare(idB);
+            });
+            courseregShowAutocompleteList(courseregStudentIdList, query);
+        });
+}
+function courseregShowAutocompleteList(arr, query) {
+    const inp = document.getElementById('studentSearch');
+    const list = document.getElementById('autocomplete-list');
+    courseregCloseAllLists();
+    if (!inp || !inp.value || !list) return false;
+    list.innerHTML = '';
+    arr.forEach(item => {
+        if (item.toLowerCase().includes(query.toLowerCase())) {
+            let div = document.createElement('div');
+            div.innerHTML = item;
+            div.className = 'autocomplete-item';
+            div.tabIndex = 0;
+            div.addEventListener('click', function () {
+                inp.value = item; // Fill input with full suggestion text
+                courseregCloseAllLists();
+            });
+            list.appendChild(div);
         }
     });
-    function courseregLoadCourseRegDataByStudentId(studentId, page = 1) {
-        const params = new URLSearchParams({
-            type: 'coursereg',
-            student_id: studentId,
-            page: page
-        });
-        fetch(`/masters/ajax/?${params.toString()}`)
-            .then(resp => resp.json())
-            .then(data => {
-                document.getElementById('coursereg-list').innerHTML = data.table_html;
-                document.getElementById('courseregTableContainer').style.display = 'block';
-                // Hide old containers if present
-                if (document.getElementById('courseregActions')) document.getElementById('courseregActions').style.display = 'none';
-                if (document.getElementById('courseregPaginationBar')) document.getElementById('courseregPaginationBar').style.display = 'none';
-                // Show new flex container
-                if (document.getElementById('courseregActionsBar')) document.getElementById('courseregActionsBar').style.display = 'flex';
-                // Show inner containers
-                if (document.getElementById('courseregActions')) document.getElementById('courseregActions').style.display = 'flex';
-                if (document.getElementById('courseregPaginationBar')) document.getElementById('courseregPaginationBar').style.display = 'flex';
-                // Update pagination HTML
-                if (document.getElementById('coursereg-pagination')) document.getElementById('coursereg-pagination').innerHTML = data.pagination_html || '';
-            });
+    if (list && list.children.length > 0) {
+        list.style.display = 'block';
+        let currentFocus = -1;
+        inp.onkeydown = function (e) {
+            let items = list.getElementsByClassName('autocomplete-item');
+            if (!items.length) return;
+            if (e.key === 'ArrowDown') {
+                currentFocus++;
+                if (currentFocus >= items.length) currentFocus = 0;
+                setActive(items, currentFocus);
+            } else if (e.key === 'ArrowUp') {
+                currentFocus--;
+                if (currentFocus < 0) currentFocus = items.length - 1;
+                setActive(items, currentFocus);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (currentFocus > -1) {
+                    items[currentFocus].click();
+                }
+            }
+        };
+        function setActive(items, idx) {
+            for (let i = 0; i < items.length; i++) {
+                items[i].classList.remove('active');
+            }
+            if (items[idx]) {
+                items[idx].classList.add('active');
+                items[idx].scrollIntoView({ block: 'nearest' });
+            }
+        }
+    } else {
+        list.style.display = 'none';
     }
-    const studentSearchElem = document.getElementById('studentSearch');
-    const searchStudentLinkElem = document.getElementById('searchStudentLink');
-    const resetStudentSearchLinkElem = document.getElementById('resetStudentSearchLink');
-    const courseregPaginationElem = document.getElementById('coursereg-pagination');
-    const printCourseRegBtnElem = document.getElementById('printCourseRegBtn');
-    const downloadCourseRegBtnElem = document.getElementById('downloadCourseRegBtn');
-    if (studentSearchElem) {
-        studentSearchElem.addEventListener('input', function () {
-            courseregFetchStudentIdAutocomplete(this.value);
-        });
+}
+function courseregCloseAllLists() {
+    const list = document.getElementById('autocomplete-list');
+    if (list) {
+        list.innerHTML = '';
+        list.style.display = 'none';
     }
-    if (searchStudentLinkElem) {
-        searchStudentLinkElem.addEventListener('click', function (e) {
+}
+document.addEventListener('mousedown', function (e) {
+    const list = document.getElementById('autocomplete-list');
+    if (list && !list.contains(e.target) && e.target.id !== 'studentSearch') {
+        courseregCloseAllLists();
+    }
+});
+function courseregLoadCourseRegDataByStudentId(studentId, page = 1) {
+    const params = new URLSearchParams({
+        type: 'coursereg',
+        student_id: studentId,
+        page: page
+    });
+    fetch(`/masters/ajax/?${params.toString()}`)
+        .then(resp => resp.json())
+        .then(data => {
+            document.getElementById('coursereg-list').innerHTML = data.table_html;
+            document.getElementById('courseregTableContainer').style.display = 'block';
+            // Hide old containers if present
+            if (document.getElementById('courseregActions')) document.getElementById('courseregActions').style.display = 'none';
+            if (document.getElementById('courseregPaginationBar')) document.getElementById('courseregPaginationBar').style.display = 'none';
+            // Show new flex container
+            if (document.getElementById('courseregActionsBar')) document.getElementById('courseregActionsBar').style.display = 'flex';
+            // Show inner containers
+            if (document.getElementById('courseregActions')) document.getElementById('courseregActions').style.display = 'flex';
+            if (document.getElementById('courseregPaginationBar')) document.getElementById('courseregPaginationBar').style.display = 'flex';
+            // Update pagination HTML
+            if (document.getElementById('coursereg-pagination')) document.getElementById('coursereg-pagination').innerHTML = data.pagination_html || '';
+        });
+}
+const studentSearchElem = document.getElementById('studentSearch');
+const searchStudentLinkElem = document.getElementById('searchStudentLink');
+const resetStudentSearchLinkElem = document.getElementById('resetStudentSearchLink');
+const courseregPaginationElem = document.getElementById('coursereg-pagination');
+const printCourseRegBtnElem = document.getElementById('printCourseRegBtn');
+const downloadCourseRegBtnElem = document.getElementById('downloadCourseRegBtn');
+if (studentSearchElem) {
+    studentSearchElem.addEventListener('input', function () {
+        courseregFetchStudentIdAutocomplete(this.value);
+    });
+}
+if (searchStudentLinkElem) {
+    searchStudentLinkElem.addEventListener('click', function (e) {
+        e.preventDefault();
+        const inputValue = studentSearchElem.value.trim();
+        // Accept either 'id - name' or just id
+        let studentId = inputValue;
+        if (inputValue.includes(' - ')) {
+            studentId = inputValue.split(' - ')[0].trim();
+        }
+        if (studentId) {
+            courseregLoadCourseRegDataByStudentId(studentId);
+        }
+    });
+}
+if (resetStudentSearchLinkElem) {
+    resetStudentSearchLinkElem.addEventListener('click', function (e) {
+        e.preventDefault();
+        studentSearchElem.value = '';
+        document.getElementById('courseregTableContainer').style.display = 'none';
+        if (document.getElementById('courseregActionsBar')) document.getElementById('courseregActionsBar').style.display = 'none';
+        if (document.getElementById('courseregActions')) document.getElementById('courseregActions').style.display = 'none';
+        if (document.getElementById('courseregPaginationBar')) document.getElementById('courseregPaginationBar').style.display = 'none';
+    });
+}
+if (courseregPaginationElem) {
+    courseregPaginationElem.addEventListener('click', function (e) {
+        if (e.target.classList.contains('page-num') || e.target.classList.contains('page-arrow')) {
             e.preventDefault();
-            const inputValue = studentSearchElem.value.trim();
-            // Accept either 'id - name' or just id
+            const page = e.target.getAttribute('data-page');
+            let inputValue = studentSearchElem.value.trim();
             let studentId = inputValue;
             if (inputValue.includes(' - ')) {
                 studentId = inputValue.split(' - ')[0].trim();
             }
-            if (studentId) {
-                courseregLoadCourseRegDataByStudentId(studentId);
-            }
+            if (page && studentId) courseregLoadCourseRegDataByStudentId(studentId, page);
+        }
+    });
+}
+if (printCourseRegBtnElem) {
+    printCourseRegBtnElem.addEventListener('click', function () {
+        const table = document.getElementById('coursereg-table').outerHTML;
+        const win = window.open('', '', 'width=900,height=700');
+        win.document.write('<html><head><title>Print Course Registrations</title>');
+        win.document.write('<link rel="stylesheet" href="/static/css/style.css">');
+        win.document.write('</head><body>');
+        win.document.write(table);
+        win.document.write('</body></html>');
+        win.document.close();
+        win.print();
+    });
+}
+if (downloadCourseRegBtnElem) {
+    downloadCourseRegBtnElem.addEventListener('click', function () {
+        let csv = 'Student ID,Student Name,Course Code,Course Name,Academic Year,Semester\n';
+        document.querySelectorAll('#coursereg-list tr').forEach(row => {
+            let cols = Array.from(row.querySelectorAll('td')).slice(1, 7).map(td => '"' + td.innerText.replace(/"/g, '""') + '"');
+            if (cols.length) csv += cols.join(',') + '\n';
         });
-    }
-    if (resetStudentSearchLinkElem) {
-        resetStudentSearchLinkElem.addEventListener('click', function (e) {
-            e.preventDefault();
-            studentSearchElem.value = '';
-            document.getElementById('courseregTableContainer').style.display = 'none';
-            if (document.getElementById('courseregActionsBar')) document.getElementById('courseregActionsBar').style.display = 'none';
-            if (document.getElementById('courseregActions')) document.getElementById('courseregActions').style.display = 'none';
-            if (document.getElementById('courseregPaginationBar')) document.getElementById('courseregPaginationBar').style.display = 'none';
-        });
-    }
-    if (courseregPaginationElem) {
-        courseregPaginationElem.addEventListener('click', function (e) {
-            if (e.target.classList.contains('page-num') || e.target.classList.contains('page-arrow')) {
-                e.preventDefault();
-                const page = e.target.getAttribute('data-page');
-                let inputValue = studentSearchElem.value.trim();
-                let studentId = inputValue;
-                if (inputValue.includes(' - ')) {
-                    studentId = inputValue.split(' - ')[0].trim();
-                }
-                if (page && studentId) courseregLoadCourseRegDataByStudentId(studentId, page);
-            }
-        });
-    }
-    if (printCourseRegBtnElem) {
-        printCourseRegBtnElem.addEventListener('click', function () {
-            const table = document.getElementById('coursereg-table').outerHTML;
-            const win = window.open('', '', 'width=900,height=700');
-            win.document.write('<html><head><title>Print Course Registrations</title>');
-            win.document.write('<link rel="stylesheet" href="/static/css/style.css">');
-            win.document.write('</head><body>');
-            win.document.write(table);
-            win.document.write('</body></html>');
-            win.document.close();
-            win.print();
-        });
-    }
-    if (downloadCourseRegBtnElem) {
-        downloadCourseRegBtnElem.addEventListener('click', function () {
-            let csv = 'Student ID,Student Name,Course Code,Course Name,Academic Year,Semester\n';
-            document.querySelectorAll('#coursereg-list tr').forEach(row => {
-                let cols = Array.from(row.querySelectorAll('td')).slice(1, 7).map(td => '"' + td.innerText.replace(/"/g, '""') + '"');
-                if (cols.length) csv += cols.join(',') + '\n';
-            });
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'course_registrations.csv';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        });
-    }
-});
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'course_registrations.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    });
+}
 // Clear Examination Form utility
 function clearExaminationForm() {
     var form = document.getElementById('examinationForm');
@@ -411,6 +628,7 @@ if (deleteExamForm) {
                 }
             })
             .catch(() => {
+                document.getElementById('deleteExamModal').style.display = 'none';
                 alert('Failed to delete examination due to network error.');
             });
     };
@@ -419,6 +637,8 @@ if (deleteExamForm) {
 function fetchExamSlotsAjax() {
     // Slot courses badge click handler (delegated)
     document.addEventListener('click', function (e) {
+        // Ensure preventDefault is called before navigation
+        if (e.defaultPrevented) return;
         const badge = e.target.closest('.slot-courses-badge');
         if (badge) {
             e.preventDefault();
@@ -513,7 +733,7 @@ function fetchExamSlotsAjax() {
         .then(response => response.json())
         .then(data => {
             if (data.slots.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;">No exam slots created yet.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;">No exam slots created yet.</td></tr>';
             } else {
                 tbody.innerHTML = '';
                 // Sort slots by exam_date, then start_time (both ascending)
@@ -556,8 +776,8 @@ function fetchExamSlotsAjax() {
                     </a>`;
                     // Room allocation badge
                     let roomBadge = '';
-                    if (slot.room_status === 'Allocated') {
-                        roomBadge = `<span class="exam-status exam-status-available" style="background:#e6f9e6;color:#1a7f1a;padding:2px 10px 2px 10px;border-radius:6px;display:inline-flex;align-items:center;font-weight:600;">Allocated <img src='https://img.icons8.com/?size=100&id=79211&format=png&color=000000' alt='Allocated' style='width:1.2em;height:1.2em;vertical-align:middle;margin-left:6px;'></span>`;
+                    if (slot.assigned_room_count > 0) {
+                        roomBadge = `<span class="exam-status exam-status-available" style="background:#e6f9e6;color:#1a7f1a;padding:2px 10px 2px 10px;border-radius:6px;display:inline-flex;align-items:center;font-weight:600;">Assigned : ${slot.assigned_room_count}</span>`;
                     } else {
                         roomBadge = `<span class="exam-status exam-status-pending" style="background:#fff3cd;color:#856404;padding:2px 10px 2px 10px;border-radius:6px;display:inline-flex;align-items:center;">Pending <img src='https://img.icons8.com/?size=100&id=rKEYSosGdrkP&format=png&color=000000' alt='Pending' style='width:1.2em;height:1.2em;vertical-align:middle;margin-left:6px;'></span>`;
                     }
@@ -600,11 +820,16 @@ function fetchExamSlotsAjax() {
         const div = document.createElement('div');
         div.className = 'popup-message popup-' + type;
         div.tabIndex = 0;
-        div.textContent = msg;
+        div.innerHTML = msg;
         popup.appendChild(div);
-        setTimeout(() => {
-            div.remove();
-        }, 3500);
+        // Remove on outside click
+        function outsideClickHandler(e) {
+            if (!div.contains(e.target)) {
+                div.remove();
+                document.removeEventListener('mousedown', outsideClickHandler);
+            }
+        }
+        document.addEventListener('mousedown', outsideClickHandler);
     }
 
     // Intercept Room Allocation and Faculty Assignment clicks for status checks
@@ -616,27 +841,29 @@ function fetchExamSlotsAjax() {
         if (roomLink || facultyLink) {
             const row = e.target.closest('tr');
             if (!row) return;
-            // 0: Exam Type, 1: Mode, 2: Date, 3: Start, 4: End, 5: Slot Code, 6: Course Status, 7: Course Count, 8: Student Count, 9: Room, 10: Faculty
+            // 0: Exam Type, 1: Mode, 2: Date, 3: Start, 4: End, 5: Slot Code, 6: Course Status, 7: Course Count, 8: Student Count, 9: Room Allocation, 10: Faculty Assignment
             const courseStatusCell = row.children[6];
-            const roomCell = row.children[9];
+            const roomStatusCell = row.children[9];
+            const facultyStatusCell = row.children[10];
             // Check for 'Pending' in course status before allowing room allocation
+            let coursePending = courseStatusCell && courseStatusCell.textContent.includes('Pending');
+            let roomPending = roomStatusCell && roomStatusCell.textContent.includes('Pending');
             if (roomLink) {
-                if (courseStatusCell && courseStatusCell.textContent.includes('Pending')) {
+                if (coursePending) {
                     e.preventDefault();
-                    showPopupMessage('Cannot allocate rooms: Course status is pending.', 'error');
+                    showPopupMessage('Room Allocation not allowed.<br><b>Previous status:</b> Course Status is <u>Pending</u>.', 'error');
                     return;
                 }
             }
-            // Check for 'Pending' in room allocation before allowing faculty assignment
             if (facultyLink) {
-                if (roomCell && roomCell.textContent.includes('Pending')) {
+                if (roomPending) {
                     e.preventDefault();
-                    showPopupMessage('Cannot assign faculty: Room allocation is pending.', 'error');
+                    showPopupMessage('Faculty Assignment not allowed.<br><b>Previous status:</b> Room Allocation is <u>Pending</u>.', 'error');
                     return;
                 }
-                if (courseStatusCell && courseStatusCell.textContent.includes('Pending')) {
+                if (coursePending) {
                     e.preventDefault();
-                    showPopupMessage('Cannot assign faculty: Course status is pending.', 'error');
+                    showPopupMessage('Faculty Assignment not allowed.<br><b>Previous status:</b> <span style="color:#b30000">Course Status is <u>Pending</u></span>. Please complete Course Status before proceeding.', 'error');
                     return;
                 }
             }
@@ -858,6 +1085,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             })
             .catch(() => {
+                document.getElementById('deleteExamModal').style.display = 'none';
                 alert('Failed to delete examination due to network error.');
             });
     };

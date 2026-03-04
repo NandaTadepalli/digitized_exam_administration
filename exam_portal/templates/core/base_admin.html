@@ -24,7 +24,7 @@
 {% if messages %}
 <div id="popup-messages">
     {% for message in messages %}
-        <div class="popup-message popup-{{ message.tags }}" tabindex="0">{{ message }}</div>
+        <div class="popup-message popup-{{ message.tags }}" tabindex="0">{{ message|safe }}</div>
     {% endfor %}
 </div>
 <script>

@@ -159,6 +159,11 @@ def ajax_exam_slots(request):
                 assignment_status = "Assigned"
             else:
                 assignment_status = "Pending"
+            # Always initialize assigned_room_count to 0
+            assigned_room_count = 0
+            if exams.exists():
+                from operations.models import RoomAllocation
+                assigned_room_count = RoomAllocation.objects.filter(exam__in=exams).count()
             slots.append({
                 'id': slot.id,
                 'exam_type': slot.exam_type,
@@ -170,6 +175,7 @@ def ajax_exam_slots(request):
                 'assignment_status': assignment_status,
                 'course_count': course_count,
                 'student_count': student_count,
+                'assigned_room_count': assigned_room_count,
             })
     return JsonResponse({'slots': slots})
 from django.http import JsonResponse

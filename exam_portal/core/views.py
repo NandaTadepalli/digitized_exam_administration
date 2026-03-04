@@ -667,3 +667,7 @@ def upload_users(request):
 
     messages.error(request, "No file uploaded or invalid CSV format.")
     return redirect("core:settings")
+
+@login_required(login_url='/accounts/login/')
+def student_dashboard(request):
+    return render(request, "core/student_dashboard.html", {"user": request.user})

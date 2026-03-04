@@ -1,12 +1,28 @@
 from django.shortcuts import render
 from .models import ExamSlot, Exam, StudentCourse
 from masters.models import Course, Room
+from django.contrib import messages
 
 def exam_rooms_alloc(request):
-    slot_id = request.GET.get('slot_id')
+    slot_id = request.GET.get('slot_id') or request.POST.get('slot_id')
     slot = None
     student_count = 0
-    rooms = Room.objects.filter(is_active=True)
+    # Find overlapping slots
+    overlapping_room_ids = []
+    if slot_id:
+        try:
+            slot = ExamSlot.objects.get(id=slot_id)
+            # Overlap: same date, time overlaps
+            overlapping_slots = ExamSlot.objects.filter(
+                exam_date=slot.exam_date,
+                start_time__lt=slot.end_time,
+                end_time__gt=slot.start_time
+            ).exclude(id=slot.id)
+            from .models import RoomAllocation
+            overlapping_room_ids = RoomAllocation.objects.filter(exam__exam_slot__in=overlapping_slots).values_list('room_id', flat=True)
+        except ExamSlot.DoesNotExist:
+            pass
+    rooms = Room.objects.filter(is_active=True).exclude(id__in=overlapping_room_ids)
     allocated_room_ids = []
     if slot_id:
         try:
@@ -19,37 +35,123 @@ def exam_rooms_alloc(request):
                 semester = slot.examination.semester if slot.examination else ''
                 students = StudentCourse.objects.filter(course=course, academic_year=academic_year, semester=semester, student__batch__batch_code=regulation)
                 student_count += students.count()
+            if request.method == "POST":
+                from .models import RoomAllocation
+                selected_room_ids = set(map(int, request.POST.getlist('selected_rooms')))
+                prev_allocs = RoomAllocation.objects.filter(exam=exams.first())
+                prev_room_ids = set(prev_allocs.values_list('room_id', flat=True))
+                # Find deleted and added rooms
+                deleted_ids = prev_room_ids - selected_room_ids
+                added_ids = selected_room_ids - prev_room_ids
+                # Delete previous allocations
+                prev_allocs.delete()
+                # Add new allocations
+                for room_id in selected_room_ids:
+                    try:
+                        room_obj = Room.objects.get(id=room_id)
+                        RoomAllocation.objects.create(exam=exams.first(), room=room_obj)
+                    except Room.DoesNotExist:
+                        continue
+                # Prepare message
+                from masters.models import Room as MasterRoom
+                added_rooms = MasterRoom.objects.filter(id__in=added_ids).values_list('room_code', flat=True)
+                deleted_rooms = MasterRoom.objects.filter(id__in=deleted_ids).values_list('room_code', flat=True)
+                msg = "Room allocations saved."
+                if added_rooms:
+                    msg += f"<br>Added rooms: {', '.join(added_rooms)}"
+                from django.shortcuts import redirect
+                from django.urls import reverse
+                # Store messages in session to show on exams.html
+                request.session['room_alloc_success'] = msg
+                if deleted_rooms:
+                    request.session['room_alloc_warning'] = f"Deleted rooms: {', '.join(deleted_rooms)}"
+                # Build query params for redirect to exams.html
+                exam_obj = None
+                exam_slot_obj = None
+                if exams.exists():
+                    exam_obj = exams.first()
+                    exam_slot_obj = exam_obj.exam_slot
+                params = {}
+                if exam_obj and exam_slot_obj:
+                    params['exam_id'] = exam_slot_obj.examination.id if exam_slot_obj.examination else ''
+                    params['exam_name'] = exam_slot_obj.examination.exam_name if exam_slot_obj.examination else ''
+                    params['start_date'] = exam_slot_obj.examination.start_date.strftime('%Y-%m-%d') if exam_slot_obj.examination and exam_slot_obj.examination.start_date else ''
+                    params['end_date'] = exam_slot_obj.examination.end_date.strftime('%Y-%m-%d') if exam_slot_obj.examination and exam_slot_obj.examination.end_date else ''
+                from urllib.parse import urlencode
+                url = reverse('operations:exams')
+                if params:
+                    url += '?' + urlencode(params)
+                return redirect(url)
+            # On GET, just fetch allocated_room_ids, do not change allocations
+            if request.method == "GET" and exams.exists():
+                from .models import RoomAllocation
+                allocated_room_ids = list(RoomAllocation.objects.filter(exam=exams.first()).values_list('room_id', flat=True))
         except ExamSlot.DoesNotExist:
             slot = None
+    import math
+    required_capacity = math.ceil(student_count * 1.1)
     return render(request, "operations/exam_rooms_alloc.html", {
         'slot': slot,
         'rooms': rooms,
         'allocated_room_ids': allocated_room_ids,
-        'student_count': student_count
+        'student_count': student_count,
+        'required_capacity': required_capacity
     })
 
 def exam_faculty_alloc(request):
     slot_id = request.GET.get('slot_id')
     slot = None
     faculties = []
+    total_students = 0
+    allocated_faculty = 0
     if slot_id:
         try:
             slot = ExamSlot.objects.get(id=slot_id)
             exams = Exam.objects.filter(exam_slot=slot)
+            from operations.models import FacultyCourse
+            from masters.models import Faculty
+            found_assignment = False
             for exam in exams:
-                # Example: faculty assignment logic
-                # Replace with actual faculty assignment model/query
-                faculties.append({
-                    'name': getattr(exam, 'faculty_name', 'N/A'),
-                    'department': getattr(exam, 'faculty_department', 'N/A'),
-                    'course': exam.course.course_name,
-                    'role': getattr(exam, 'faculty_role', 'N/A')
-                })
+                academic_year = slot.examination.academic_year if slot.examination else ''
+                semester = slot.examination.semester if slot.examination else ''
+                # Count students for this exam
+                from operations.models import StudentCourse
+                students = StudentCourse.objects.filter(course=exam.course, academic_year=academic_year, semester=semester)
+                total_students += students.count()
+                faculty_courses = FacultyCourse.objects.filter(course=exam.course, academic_year=academic_year, semester=semester, is_active=True)
+                for fc in faculty_courses:
+                    faculty_obj = fc.faculty
+                    faculties.append({
+                        'id': faculty_obj.faculty_id,
+                        'name': faculty_obj.faculty_name,
+                        'department': faculty_obj.dept.dept_name if faculty_obj.dept else '',
+                        'course': exam.course.course_name if exam.course else '',
+                        'role': faculty_obj.designation if hasattr(faculty_obj, 'designation') else ''
+                    })
+                    found_assignment = True
+            allocated_faculty = len(faculties)
+            # If no assignments found, show all active faculty
+            if not found_assignment:
+                from masters.models import Faculty
+                active_faculty = Faculty.objects.filter(status='ACTIVE')
+                for faculty_obj in active_faculty:
+                    faculties.append({
+                        'id': faculty_obj.faculty_id,
+                        'name': faculty_obj.faculty_name,
+                        'department': faculty_obj.dept.dept_name if faculty_obj.dept else '',
+                        'course': '',
+                        'role': faculty_obj.designation if hasattr(faculty_obj, 'designation') else ''
+                    })
+                allocated_faculty = len(active_faculty)
         except ExamSlot.DoesNotExist:
             slot = None
+    import math
+    required_faculty = math.ceil(total_students / 50) if total_students > 0 else 0
     return render(request, "operations/exam_faculty_alloc.html", {
         'slot': slot,
-        'faculties': faculties
+        'faculties': faculties,
+        'required_faculty': required_faculty,
+        'allocated_faculty': allocated_faculty
     })
 from django.http import JsonResponse
 from django.core.paginator import Paginator
@@ -138,21 +240,20 @@ def examination(request):
                 end_date=end_date
             )
             messages.success(request, "Exam dates declared successfully.")
-            return render(request, "operations/examination.html", {"form_data": {}, "today": today, "acd_years": acd_years, "semesters": semesters})
+            from django.shortcuts import redirect
+            return redirect('operations:examination')
         except Exception as e:
             messages.error(request, f"Error saving examination: {e}")
             return render(request, "operations/examination.html", {"form_data": form_data, "today": today})
     return render(request, "operations/examination.html", {"form_data": {}, "today": today, "acd_years": acd_years, "semesters": semesters})
-from django.shortcuts import render
-from django.contrib import messages
-from .models import ExamSlot, Exam
+
 
 def attendence(request):
     return render(request, "operations/attendence.html")
 
 @login_required
 def exams(request):
-    from .models import Exam
+    # from .models import Exam (already imported at top)
     slot_list = ExamSlot.objects.all().order_by('-exam_date', '-start_time')
     # Build a dict of slot_id to status
     exam_status = {}
@@ -161,6 +262,15 @@ def exams(request):
             exam_status[slot.id] = 'Created'
         else:
             exam_status[slot.id] = 'Pending'
+
+    # Show room allocation messages from session
+    from django.contrib import messages
+    if request.session.get('room_alloc_success'):
+        messages.success(request, request.session['room_alloc_success'])
+        del request.session['room_alloc_success']
+    if request.session.get('room_alloc_warning'):
+        messages.warning(request, request.session['room_alloc_warning'])
+        del request.session['room_alloc_warning']
 
     # Get examname from Examinations table using exam_id from GET parameters
     exam_id = request.GET.get('exam_id')
@@ -261,29 +371,54 @@ def exams(request):
         mode_db = mode
         slot_code_db = slot_code
         try:
-            from .models import Examinations
             exam_obj = None
             if exam_id:
                 exam_obj = Examinations.objects.filter(id=exam_id).first()
             elif exam_name:
                 exam_obj = Examinations.objects.filter(exam_name=exam_name).first()
-            # 1. Create ExamSlot and link to Examinations
-            slot = ExamSlot(
-                examination=exam_obj,
-                exam_type=exam_type_db,
-                mode=mode_db,
+
+            # Check for slot clash with all required fields
+            clash_exists = ExamSlot.objects.filter(
                 exam_date=exam_date,
                 start_time=start_time,
                 end_time=end_time,
-                slot_code=slot_code_db
-            )
-            slot.save()
-            messages.success(request, "Exam slot created successfully.")
-        except Exception as e:
-            if 'Duplicate entry' in str(e) and 'uq_exam_slot_time' in str(e):
-                messages.error(request, "An exam slot with the same date, start time, end time, and slot code already exists. Please choose a different time or slot.")
+                slot_code=slot_code_db,
+                exam_type=exam_type_db,
+                mode=mode_db
+            ).exists()
+            if clash_exists:
+                messages.error(request, "An exam slot with the same date, start time, end time, slot code, exam type, and mode already exists. Please choose a different time or slot.")
             else:
-                messages.error(request, f"Error creating exam slot: {str(e)}")
+                slot = ExamSlot(
+                    examination=exam_obj,
+                    exam_type=exam_type_db,
+                    mode=mode_db,
+                    exam_date=exam_date,
+                    start_time=start_time,
+                    end_time=end_time,
+                    slot_code=slot_code_db
+                )
+                slot.save()
+                messages.success(request, "Exam slot created successfully.")
+                from django.shortcuts import redirect
+                from django.urls import reverse
+                import urllib.parse
+                # Build query params for redirect
+                query_params = {}
+                if exam_id:
+                    query_params['exam_id'] = exam_id
+                if exam_name:
+                    query_params['exam_name'] = exam_name
+                if q_start_date:
+                    query_params['start_date'] = q_start_date
+                if q_end_date:
+                    query_params['end_date'] = q_end_date
+                url = reverse('operations:exams')
+                if query_params:
+                    url += '?' + urllib.parse.urlencode(query_params)
+                return redirect(url)
+        except Exception as e:
+            messages.error(request, f"Error creating exam slot: {str(e)}")
     slot_list = ExamSlot.objects.all().order_by('-exam_date', '-start_time')
     form_data = {'examname': examname}
     return render(request, "operations/exams.html", {
@@ -372,8 +507,10 @@ def exam_scheduling(request, slot_id):
                 import logging
                 logging.exception(f"Error scheduling exam for group {group}: {e}")
                 messages.error(request, f"Error scheduling exam for group {group}: {e}")
+        from django.shortcuts import redirect
         if created:
             messages.success(request, f"Scheduled {created} exam(s) successfully.")
+            return redirect('exam_scheduling', slot_id=slot_id)
         else:
             messages.error(request, "No exams were scheduled. Please try again.")
     # Only fetch filter values for dropdowns

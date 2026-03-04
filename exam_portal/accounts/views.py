@@ -11,7 +11,20 @@ def login_view(request):
 
         if user is not None:
             login(request, user)
-            return redirect("/dashboard/")   # dashboard home
+            # Redirect based on user role
+            if hasattr(user, 'role'):
+                if user.role == 'admin':
+                    return redirect('/dashboard/')
+                elif user.role == 'faculty':
+                    return redirect('/faculty/dashboard/')
+                elif user.role == 'student':
+                    return redirect('/student/dashboard/')
+                elif user.role == 'hod':
+                    return redirect('/hod/dashboard/')
+                elif user.role == 'dept_exam_controller':
+                    return redirect('/dec/dashboard/')
+            # Default fallback
+            return redirect('/dashboard/')
         else:
             messages.error(request, "Invalid username or password")
 

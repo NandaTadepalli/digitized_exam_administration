@@ -1,0 +1,92 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Student Portal{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins&display=swap" rel="stylesheet">
+</head>
+<body>
+    <button class="hamburger" id="openSidebarBtn" aria-label="Open sidebar">
+        <span></span>
+        <span></span>
+        <span></span>
+    </button>
+    {% if messages %}
+    <div id="popup-messages">
+        {% for message in messages %}
+            <div class="popup-message popup-{{ message.tags }}" tabindex="0">{{ message|safe }}</div>
+        {% endfor %}
+    </div>
+    <script>
+    document.addEventListener('mousedown', function(event) {
+        var popup = document.getElementById('popup-messages');
+        if (!popup) return;
+        if (!popup.contains(event.target)) {
+            popup.style.display = 'none';
+        }
+    });
+    </script>
+    {% endif %}
+    <div id="page">
+        <div id="sidebar">
+            <button class="close-btn" id="closeSidebarBtn" aria-label="Close sidebar">&times;</button>
+            <div class="sidebar-pic">
+                <img src="{% static 'img/user.jpg' %}" alt="User Profile" style="width:50px; height:50px; border-radius:50%; padding:7px;">
+                <p style="font-size:22px; font-family:'Times New Roman', Times, serif; color:white;">{{ user.username }}</p>
+            </div>
+            <div class="sidebar-links">
+                <ul>
+                    <li{% if request.resolver_match.url_name == 'student_dashboard' %} class="active"{% endif %}><a href="{% url 'core:student_dashboard' %}">Dashboard</a></li>
+                    <li{% if request.resolver_match.url_name == 'student_exams' %} class="active"{% endif %}><a href="#">My Exams</a></li>
+                    <li{% if request.resolver_match.url_name == 'student_seating' %} class="active"{% endif %}><a href="#">Seating Plan</a></li>
+                    <li{% if request.resolver_match.url_name == 'student_attendance' %} class="active"{% endif %}><a href="#">Attendance</a></li>
+                    <li{% if request.resolver_match.url_name == 'student_profile' %} class="active"{% endif %}><a href="#">Profile</a></li>
+                    <li><a href="{% url 'accounts:logout' %}">Logout</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="content" id="main-content">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+    <script>
+const sidebar = document.getElementById('sidebar');
+const openBtn = document.getElementById('openSidebarBtn');
+const closeBtn = document.getElementById('closeSidebarBtn');
+const mainContent = document.getElementById('main-content');
+function openSidebar() {
+    sidebar.classList.add('active');
+    document.body.classList.add('sidebar-open');
+    openBtn.style.display = 'none';
+}
+function closeSidebar() {
+    sidebar.classList.remove('active');
+    document.body.classList.remove('sidebar-open');
+    openBtn.style.display = 'flex';
+}
+openBtn.addEventListener('click', openSidebar);
+closeBtn.addEventListener('click', closeSidebar);
+mainContent.addEventListener('click', function () {
+    if (window.innerWidth <= 900 && sidebar.classList.contains('active')) {
+        closeSidebar();
+    }
+});
+function handleResize() {
+    if (window.innerWidth > 900) {
+        sidebar.classList.remove('active');
+        document.body.classList.remove('sidebar-open');
+        openBtn.style.display = 'none';
+    } else {
+        openBtn.style.display = sidebar.classList.contains('active') ? 'none' : 'flex';
+    }
+}
+window.addEventListener('resize', handleResize);
+window.addEventListener('DOMContentLoaded', handleResize);
+    </script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="{% static 'js/scripts.js' %}"></script>
+</body>
+</html>

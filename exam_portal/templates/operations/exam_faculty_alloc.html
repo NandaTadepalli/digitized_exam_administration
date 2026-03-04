@@ -17,30 +17,53 @@
 		<div class="readonly-field" style="min-width: 220px;"><label>Academic Year:</label> <span>{{ slot.examination.academic_year }}</span></div>
 		<div class="readonly-field" style="min-width: 220px;"><label>Semester:</label> <span>{{ slot.examination.semester }}</span></div>
 	</div>
+	<div class="faculty-capacity-summary-wrapper">
+		<span class="faculty-capacity-summary-item faculty-capacity-summary-flex">
+			<span class="faculty-capacity-summary-label">Total Required Faculty:</span>
+			<span id="required-faculty-display" class="faculty-capacity-summary-value required">{{ required_faculty }}</span>
+		</span>
+		<span class="faculty-capacity-summary-item faculty-capacity-summary-flex">
+			<span class="faculty-capacity-summary-label">Allocated Faculty:</span>
+			<span id="allocated-faculty-display" class="faculty-capacity-summary-value selected">{{ allocated_faculty }}</span>
+		</span>
+	</div>
 	<div class="faculty-assigned">
 		<h3>Faculty Assigned</h3>
-		<table class="table">
-			<thead>
-				<tr>
-					<th>Faculty Name</th>
-					<th>Department</th>
-					<th>Course</th>
-					<th>Role</th>
-				</tr>
-			</thead>
-			<tbody>
-				{% for faculty in faculties %}
-				<tr>
-					<td>{{ faculty.name }}</td>
-					<td>{{ faculty.department }}</td>
-					<td>{{ faculty.course }}</td>
-					<td>{{ faculty.role }}</td>
-				</tr>
-				{% empty %}
-				<tr><td colspan="4" style="text-align:center;">No faculty assigned.</td></tr>
-				{% endfor %}
-			</tbody>
-		</table>
+		<form method="post" action="">
+			{% csrf_token %}
+			<div style="max-height: 375px; overflow-y: auto;">
+				<table class="table" style="min-width:600px; margin-top: 0px;">
+					<thead style="position:sticky; top:0; background:#f8fafc; z-index:2;">
+						<tr>
+							<th>Select</th>
+							<th>Faculty ID</th>
+							<th>Faculty Name</th>
+							<th>Department</th>
+							<th>Role</th>
+						</tr>
+					</thead>
+					<tbody>
+						{% for faculty in faculties %}
+						<tr>
+							<td><input type="checkbox" name="selected_faculty" value="{{ faculty.id }}"></td>
+							<td>{{ faculty.id }}</td>
+							<td>{{ faculty.name }}</td>
+							<td>{{ faculty.department }}</td>
+							<td>{{ faculty.role }}</td>
+						</tr>
+						{% empty %}
+						<tr><td colspan="5" style="text-align:center;">No faculty assigned.</td></tr>
+						{% endfor %}
+					</tbody>
+				</table>
+			</div>
+			<div style="margin-top:10px;">
+				<button type="submit" class="control-btn">Assign Selected Faculty</button>
+				<button type="button" class="control-btn" id="clear-faculty-selection" style="margin-left:10px;">Clear All</button>
+			</div>
+		</form>
 	</div>
 </div>
 {% endblock %}
+
+{% comment %} Moved faculty allocation JS to scripts.js {% endcomment %}
