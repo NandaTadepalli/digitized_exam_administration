@@ -172,7 +172,7 @@
             </tbody>
         </table>
         <!-- Delete Slot Modal -->
-        <div id="deleteSlotModal" class="modal" style="display:none;position:fixed;z-index:1000;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.4);align-items:center;justify-content:center;">
+        <div id="deleteSlotModal" class="modal" style="display:none;position:fixed;z-index:1000;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;">
             <div class="modal-content" style="background:#fff;padding:2em;max-width:500px;border-radius:8px;position:relative;">
                 <span id="closeDeleteSlotModal" style="position:absolute;top:10px;right:16px;font-size:1.5em;cursor:pointer;">&times;</span>
                 <h2 style="margin-top:0;">Confirm Slot Deletion</h2>
@@ -189,6 +189,11 @@
         <script>
             window.examIdForSlots = '{{ request.GET.exam_id|default:"" }}';
             document.addEventListener('DOMContentLoaded', function() {
+                // Force hide all modals on page load
+                var modals = document.querySelectorAll('.modal');
+                modals.forEach(function(modal) {
+                    modal.style.display = 'none';
+                });
                 fetchExamSlotsAjax();
             });
         </script>

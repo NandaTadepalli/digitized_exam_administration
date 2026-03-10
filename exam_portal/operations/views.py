@@ -1,3 +1,149 @@
+def ajax_seating_plan(request):
+    slot_id = request.GET.get('slot_id')
+    room_id = request.GET.get('room_id')
+    from .models import SeatingPlan, StudentExamMap, ExamSlot, Room
+    seating = []
+    if slot_id and room_id:
+        plans = SeatingPlan.objects.filter(exam_slot_id=slot_id, room_id=room_id).select_related('student_exam__student', 'student_exam__exam')
+        for plan in plans:
+            student = plan.student_exam.student
+            exam = plan.student_exam.exam
+            seating.append({
+                'student_id': student.student_id,
+                'course_code': exam.course.course_code if exam and exam.course else '',
+                'row_no': plan.row_no,
+                'seat_no': plan.seat_no,
+            })
+    return JsonResponse({'success': True, 'seating': seating})
+def seatingplan(request):
+    slot_id = request.GET.get('slot_id')
+    room_id = request.GET.get('room_id')
+    from .models import SeatingPlan, ExamSlot, Room, Examinations, InvigilationDuty
+    faculty_summary = []
+    if slot_id and room_id:
+        duties = InvigilationDuty.objects.filter(exam_slot_id=slot_id, room_id=room_id).select_related('faculty')
+        for duty in duties:
+            faculty_summary.append({
+                'faculty_id': duty.faculty.faculty_id,
+                'faculty_name': duty.faculty.faculty_name,
+            })
+    seating = SeatingPlan.objects.filter(exam_slot_id=slot_id, room_id=room_id).select_related('student_exam__student', 'student_exam__exam', 'exam_slot', 'room')
+    slot = ExamSlot.objects.filter(id=slot_id).first()
+    room = Room.objects.filter(id=room_id).first()
+    exam = slot.examination if slot else None
+    # Find max row and col
+    max_row = 0
+    max_col = 0
+    seating_map = {}
+    course_summary = {}
+    for plan in seating:
+        row = plan.row_no
+        col = plan.seat_no
+        if row > max_row:
+            max_row = row
+        if col > max_col:
+            max_col = col
+        if row not in seating_map:
+            seating_map[row] = {}
+        course_code = plan.student_exam.exam.course.course_code if plan.student_exam.exam and plan.student_exam.exam.course else ''
+        seating_map[row][col] = {
+            'student_id': plan.student_exam.student.student_id,
+            'course_code': course_code,
+        }
+        if course_code:
+            course_summary[course_code] = course_summary.get(course_code, 0) + 1
+    row_range = list(range(1, max_row+2))
+    col_range = list(range(1, max_col+2))
+    return render(request, "operations/seatingplan.html", {
+        'exam': exam,
+        'room': room,
+        'slot': slot,
+        'seating_map': seating_map,
+        'row_range': row_range,
+        'col_range': col_range,
+        'course_summary': course_summary,
+        'faculty_summary': faculty_summary,
+    })
+def room_alloc_view(request):
+    from .models import Examinations, ExamSlot, RoomAllocation, SeatingPlan, InvigilationDuty
+    exam_id = request.GET.get('exam_id')
+    exam = None
+    exam_data = {}
+    slot_rows = []
+    if exam_id:
+        exam = Examinations.objects.filter(id=exam_id).first()
+        if exam:
+            slots = ExamSlot.objects.filter(examination=exam)
+            total_slots = slots.count()
+            generated_slots = slots.filter(is_generated=True).count()
+            exam_data = {
+                'exam_name': exam.exam_name,
+                'academic_year': exam.academic_year,
+                'semester': exam.semester,
+                'start_date': exam.start_date.strftime('%Y-%m-%d'),
+                'end_date': exam.end_date.strftime('%Y-%m-%d'),
+                'total_slots': total_slots,
+                'generated_slots': generated_slots,
+            }
+            for slot in slots:
+                room_allocs = RoomAllocation.objects.filter(exam_slot=slot).select_related('room')
+                for room_alloc in room_allocs:
+                    room = room_alloc.room
+                    assigned_cap = SeatingPlan.objects.filter(exam_slot=slot, room=room).count()
+                    invigilator_objs = InvigilationDuty.objects.filter(exam_slot=slot, room=room).select_related('faculty')
+                    invigilator_ids = [str(inv.faculty.faculty_id) for inv in invigilator_objs]
+                    slot_rows.append({
+                        'exam_type': slot.exam_type,
+                        'mode': slot.mode,
+                        'exam_date': slot.exam_date.strftime('%Y-%m-%d'),
+                        'start_time': slot.start_time.strftime('%H:%M'),
+                        'end_time': slot.end_time.strftime('%H:%M'),
+                        'slot_code': slot.slot_code,
+                        'room_name': room.room_code,
+                        'actual_cap': room.capacity,
+                        'assigned_cap': assigned_cap,
+                        'invigilator_ids': invigilator_ids,
+                        'slot_id': slot.id,
+                        'room_id': room.id,
+                    })
+    return render(request, "operations/room_alloc_view.html", {'exam': exam_data, 'slot_rows': slot_rows})
+from django.views.decorators.http import require_POST
+from django.http import JsonResponse
+from .allocations import generate_seating_plan
+
+# AJAX endpoint to generate seating plan for a slot
+@require_POST
+def ajax_generate_seating_plan(request):
+    slot_id = request.POST.get('slot_id')
+    if not slot_id:
+        return JsonResponse({'status': 'error', 'error': 'Missing slot_id'})
+    from operations.models import ExamSlot, Exam, StudentExamMap, RoomAllocation, FacultyAvailability, SeatingPlan, InvigilationDuty
+    try:
+        slot = ExamSlot.objects.get(pk=slot_id)
+    except ExamSlot.DoesNotExist:
+        return JsonResponse({'status': 'error', 'error': 'Slot not found'})
+    exams = Exam.objects.filter(exam_slot=slot)
+    student_maps = StudentExamMap.objects.filter(exam__in=exams)
+    students_count = student_maps.count()
+    rooms = RoomAllocation.objects.filter(exam_slot=slot)
+    faculty_avail = FacultyAvailability.objects.filter(exam_slot=slot, is_active=True)
+    seating_count = SeatingPlan.objects.filter(exam_slot=slot).count()
+    invigilation_count = InvigilationDuty.objects.filter(exam_slot=slot).count()
+    # If already generated, check if all assigned
+    if slot.is_generated:
+        all_seated = seating_count >= students_count and students_count > 0
+        all_invigilated = invigilation_count >= rooms.count() and rooms.count() > 0
+        if not (all_seated and all_invigilated):
+            # If seating/invigilation data is missing, reset is_generated
+            slot.is_generated = False
+            slot.save()
+        if all_seated and all_invigilated:
+            return JsonResponse({'status': 'assigned', 'message': 'Seating and invigilation already completed.'})
+        else:
+            return JsonResponse({'status': 'update', 'message': 'Some assignments missing. Please update.'})
+    # If not generated, proceed
+    result = generate_seating_plan(slot_id)
+    return JsonResponse(result)
 from django.shortcuts import render
 from .models import ExamSlot, Exam, StudentCourse
 from masters.models import Course, Room
@@ -7,21 +153,7 @@ def exam_rooms_alloc(request):
     slot_id = request.GET.get('slot_id') or request.POST.get('slot_id')
     slot = None
     student_count = 0
-    # Find overlapping slots
     overlapping_room_ids = []
-    if slot_id:
-        try:
-            slot = ExamSlot.objects.get(id=slot_id)
-            # Overlap: same date, time overlaps
-            overlapping_slots = ExamSlot.objects.filter(
-                exam_date=slot.exam_date,
-                start_time__lt=slot.end_time,
-                end_time__gt=slot.start_time
-            ).exclude(id=slot.id)
-            from .models import RoomAllocation
-            overlapping_room_ids = RoomAllocation.objects.filter(exam_slot__in=overlapping_slots).values_list('room_id', flat=True)
-        except ExamSlot.DoesNotExist:
-            pass
     rooms = Room.objects.filter(is_active=True).exclude(id__in=overlapping_room_ids)
     allocated_room_ids = []
     if slot_id:
@@ -40,19 +172,15 @@ def exam_rooms_alloc(request):
                 selected_room_ids = set(map(int, request.POST.getlist('selected_rooms')))
                 prev_allocs = RoomAllocation.objects.filter(exam_slot=slot)
                 prev_room_ids = set(prev_allocs.values_list('room_id', flat=True))
-                # Find deleted and added rooms
                 deleted_ids = prev_room_ids - selected_room_ids
                 added_ids = selected_room_ids - prev_room_ids
-                # Delete previous allocations
                 prev_allocs.delete()
-                # Add new allocations
                 for room_id in selected_room_ids:
                     try:
                         room_obj = Room.objects.get(id=room_id)
                         RoomAllocation.objects.create(exam_slot=slot, room=room_obj)
                     except Room.DoesNotExist:
                         continue
-                # Prepare message
                 from masters.models import Room as MasterRoom
                 added_rooms = MasterRoom.objects.filter(id__in=added_ids).values_list('room_code', flat=True)
                 deleted_rooms = MasterRoom.objects.filter(id__in=deleted_ids).values_list('room_code', flat=True)
@@ -61,11 +189,9 @@ def exam_rooms_alloc(request):
                     msg += f"<br>Added rooms: {', '.join(added_rooms)}"
                 from django.shortcuts import redirect
                 from django.urls import reverse
-                # Store messages in session to show on exams.html
                 request.session['room_alloc_success'] = msg
                 if deleted_rooms:
                     request.session['room_alloc_warning'] = f"Deleted rooms: {', '.join(deleted_rooms)}"
-                # Build query params for redirect to exams.html
                 exam_obj = None
                 exam_slot_obj = None
                 if exams.exists():
@@ -82,10 +208,17 @@ def exam_rooms_alloc(request):
                 if params:
                     url += '?' + urlencode(params)
                 return redirect(url)
-            # On GET, just fetch allocated_room_ids, do not change allocations
+            # On GET, auto-select rooms using estimate_rooms_required
             if request.method == "GET" and exams.exists():
                 from .models import RoomAllocation
                 allocated_room_ids = list(RoomAllocation.objects.filter(exam_slot=slot).values_list('room_id', flat=True))
+                # If no rooms allocated, use estimate_rooms_required to auto-select
+                if not allocated_room_ids:
+                    from operations.allocations import estimate_rooms_required
+                    estimate = estimate_rooms_required(slot_id)
+                    room_codes = [r['room'] for r in estimate.get('room_distribution', [])]
+                    room_objs = Room.objects.filter(room_code__in=room_codes)
+                    allocated_room_ids = list(room_objs.values_list('id', flat=True))
         except ExamSlot.DoesNotExist:
             slot = None
     import math
@@ -200,9 +333,10 @@ def exam_faculty_alloc(request):
                 })
                 found_assignment = True
         allocated_faculty = len(faculties)
-        if total_students > 0:
-            import math
-            required_faculty = math.ceil(total_students / 50)
+        # Use estimate_rooms_required to get faculty_required based on selected rooms
+        from operations.allocations import estimate_rooms_required
+        estimate = estimate_rooms_required(slot_id)
+        required_faculty = estimate.get('faculty_required', 0)
         if not found_assignment:
             active_faculty = Faculty.objects.filter(status='ACTIVE').exclude(faculty_id__in=overlapping_faculty_ids)
             for faculty_obj in active_faculty:
@@ -227,17 +361,36 @@ def exam_faculty_alloc(request):
         'allocated_faculty_objs': allocated_faculty_objs,
         'allocated_faculty_ids': allocated_faculty_ids
     })
-    import math
-    required_faculty = math.ceil(total_students / 50) if total_students > 0 else 0
-    return render(request, "operations/exam_faculty_alloc.html", {
-        'slot': slot,
-        'faculties': faculties,
-        'required_faculty': required_faculty,
-        'allocated_faculty': allocated_faculty
-    })
 from django.http import JsonResponse
 from django.core.paginator import Paginator
 from django.contrib.auth.decorators import login_required
+
+from django.db import transaction
+
+def delete_exam_and_related(exam_id):
+    from .models import Examinations, ExamSlot, Exam, StudentExamMap, RoomAllocation, FacultyAvailability, InvigilationDuty, SeatingPlan, Attendance
+    with transaction.atomic():
+        exam = Examinations.objects.filter(id=exam_id).first()
+        if not exam:
+            return False
+        slots = ExamSlot.objects.filter(examination=exam)
+        for slot in slots:
+            exams = Exam.objects.filter(exam_slot=slot)
+            for e in exams:
+                # Delete student exam maps and attendance
+                student_maps = StudentExamMap.objects.filter(exam=e)
+                for sm in student_maps:
+                    Attendance.objects.filter(student_exam=sm).delete()
+                SeatingPlan.objects.filter(student_exam__in=student_maps).delete()
+                student_maps.delete()
+                e.delete()
+            RoomAllocation.objects.filter(exam_slot=slot).delete()
+            FacultyAvailability.objects.filter(exam_slot=slot).delete()
+            InvigilationDuty.objects.filter(exam_slot=slot).delete()
+            SeatingPlan.objects.filter(exam_slot=slot).delete()
+            slot.delete()
+        exam.delete()
+    return True
 
 def ajax_examinations(request):
     from .models import Examinations
@@ -272,6 +425,16 @@ def examination(request):
     acd_years = StudentCourse.objects.values_list('academic_year', flat=True).distinct().order_by('academic_year')
     semesters = StudentCourse.objects.values_list('semester', flat=True).distinct().order_by('semester')
     if request.method == "POST":
+        # Handle exam deletion
+        if request.POST.get("delete_exam_id"):
+            delete_exam_id = request.POST.get("delete_exam_id")
+            success = delete_exam_and_related(delete_exam_id)
+            if success:
+                messages.success(request, "Exam and all related data deleted successfully.")
+            else:
+                messages.error(request, "Failed to delete exam. Exam not found.")
+            # After deletion, skip further processing
+            return render(request, "operations/examination.html", {"form_data": {}, "today": today, "acd_years": acd_years, "semesters": semesters})
         exam_name = request.POST.get("examname", "").strip()
         academic_year = request.POST.get("academic_year", "").strip()
         semester = request.POST.get("semester", "").strip()
@@ -513,7 +676,24 @@ def exams(request):
     })
 
 def roomalloc(request):
-    return render(request, "operations/roomalloc.html")
+    from .models import Examinations, ExamSlot
+    exams = Examinations.objects.all().order_by('-start_date', '-end_date', 'exam_name')
+    exam_list = []
+    for exam in exams:
+        slots = ExamSlot.objects.filter(examination=exam)
+        total_slots = slots.count()
+        generated_slots = slots.filter(is_generated=True).count()
+        exam_list.append({
+            'id': exam.id,
+            'exam_name': exam.exam_name,
+            'academic_year': exam.academic_year,
+            'semester': exam.semester,
+            'start_date': exam.start_date.strftime('%Y-%m-%d'),
+            'end_date': exam.end_date.strftime('%Y-%m-%d'),
+            'total_slots': total_slots,
+            'generated_slots': generated_slots,
+        })
+    return render(request, "operations/roomalloc.html", {'exams': exam_list})
 
 @login_required
 def roomalloc_content(request):

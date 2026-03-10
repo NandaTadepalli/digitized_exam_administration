@@ -164,11 +164,20 @@ def ajax_delete_examination(request):
                 if not exam:
                     return JsonResponse({'success': False, 'error': 'Examination not found.'})
                 slots = ExamSlot.objects.filter(examination=exam)
+                from .models import FacultyAvailability, RoomAllocation, InvigilationDuty, SeatingPlan
+                from django.db import connection
                 for slot in slots:
                     exams = Exam.objects.filter(exam_slot=slot)
                     for ex in exams:
                         StudentExamMap.objects.filter(exam=ex).delete()
                     exams.delete()
+                    FacultyAvailability.objects.filter(exam_slot=slot).delete()
+                    RoomAllocation.objects.filter(exam_slot=slot).delete()
+                    InvigilationDuty.objects.filter(exam_slot=slot).delete()
+                    SeatingPlan.objects.filter(exam_slot=slot).delete()
+                    # Raw SQL delete for faculty_slot_selection
+                    with connection.cursor() as cursor:
+                        cursor.execute("DELETE FROM faculty_slot_selection WHERE exam_slot_id = %s", [slot.id])
                 slots.delete()
                 exam.delete()
                 return JsonResponse({'success': True})
@@ -193,14 +202,26 @@ def ajax_exam_slots(request):
                 assignment_status = "Assigned"
             else:
                 assignment_status = "Pending"
-            # Always initialize assigned_room_count to 0
+            # Always initialize assigned_room_count and assigned_faculty_count to 0
             assigned_room_count = 0
+            assigned_faculty_count = 0
             if exams.exists():
                 from operations.models import RoomAllocation
                 assigned_room_count = RoomAllocation.objects.filter(exam_slot=slot).count()
                 # Count assigned faculty for this slot
                 from operations.models import FacultyAvailability
                 assigned_faculty_count = FacultyAvailability.objects.filter(exam_slot=slot, is_active=True).count()
+            # Check if generated and all assignments complete
+            is_generated = getattr(slot, 'is_generated', False)
+            from operations.models import SeatingPlan, InvigilationDuty
+            seating_count = SeatingPlan.objects.filter(exam_slot=slot).count()
+            invigilation_count = InvigilationDuty.objects.filter(exam_slot=slot).count()
+            # If seating/invigilation data is missing, force is_generated to False
+            if is_generated and (seating_count == 0 or invigilation_count == 0):
+                is_generated = False
+            all_assigned = False
+            if is_generated and student_count > 0 and assigned_room_count > 0 and assigned_faculty_count > 0:
+                all_assigned = seating_count >= student_count and invigilation_count >= assigned_room_count
             slots.append({
                 'id': slot.id,
                 'exam_type': slot.exam_type,
@@ -213,7 +234,9 @@ def ajax_exam_slots(request):
                 'course_count': course_count,
                 'student_count': student_count,
                 'assigned_room_count': assigned_room_count,
-                    'assigned_faculty_count': assigned_faculty_count,
+                'assigned_faculty_count': assigned_faculty_count,
+                'is_generated': is_generated,
+                'all_assigned': all_assigned,
             })
     return JsonResponse({'slots': slots})
 from django.http import JsonResponse

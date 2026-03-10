@@ -13,6 +13,7 @@ urlpatterns = [
     path("", root_redirect, name="root"),
     path("dashboard/", views.dashboard, name="dashboard"),
     path("student/dashboard/", views.student_dashboard, name="student_dashboard"),
+    path("student/exams/", views.student_exams, name="student_exams"),
     path("notifications/", views.notifications, name="notifications"),
     path("settings/", views.settings_view, name="settings"),
     path("settings/upload_departments/", views.upload_departments, name="upload_departments"),

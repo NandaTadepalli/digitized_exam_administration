@@ -40,10 +40,10 @@
             <div class="sidebar-links">
                 <ul>
                     <li{% if request.resolver_match.url_name == 'student_dashboard' %} class="active"{% endif %}><a href="{% url 'core:student_dashboard' %}">Dashboard</a></li>
-                    <li{% if request.resolver_match.url_name == 'student_exams' %} class="active"{% endif %}><a href="#">My Exams</a></li>
-                    <li{% if request.resolver_match.url_name == 'student_seating' %} class="active"{% endif %}><a href="#">Seating Plan</a></li>
+                    <li{% if request.resolver_match.url_name == 'coursereg' %} class="active"{% endif %}><a href="{% url 'masters:coursereg' %}">Courses</a></li>
+                    <li{% if request.resolver_match.url_name == 'student_exams' %} class="active"{% endif %}><a href="{% url 'core:student_exams' %}">My Exams</a></li>
                     <li{% if request.resolver_match.url_name == 'student_attendance' %} class="active"{% endif %}><a href="#">Attendance</a></li>
-                    <li{% if request.resolver_match.url_name == 'student_profile' %} class="active"{% endif %}><a href="#">Profile</a></li>
+                    <li{% if request.resolver_match.url_name == 'student_detail' %} class="active"{% endif %}><a href="{% url 'masters:student_detail' user.student_profile.pk %}">Profile</a></li>
                     <li><a href="{% url 'accounts:logout' %}">Logout</a></li>
                 </ul>
             </div>

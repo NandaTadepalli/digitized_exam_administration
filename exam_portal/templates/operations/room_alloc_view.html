@@ -1,0 +1,63 @@
+{% extends "core/base_admin.html" %}
+{% block content %}
+<div class="pages-main">
+    <h1 class="pages-main-head">Room Allocation Details</h1>
+    <div class="controls-1" style="display: flex; flex-wrap: wrap; gap: 20px; background: #f8fafc; border-radius: 12px;margin-bottom: 5px;">
+        <div class="readonly-field" style="min-width: 220px;"><label>Exam Name:</label> <span>{{ exam.exam_name }}</span></div>
+        <div class="readonly-field" style="min-width: 220px;"><label>Academic Year:</label> <span>{{ exam.academic_year }}</span></div>
+        <div class="readonly-field" style="min-width: 220px;"><label>Semester:</label> <span>{{ exam.semester }}</span></div>
+        <div class="readonly-field" style="min-width: 220px;"><label>Start Date:</label> <span>{{ exam.start_date }}</span></div>
+        <div class="readonly-field" style="min-width: 220px;"><label>End Date:</label> <span>{{ exam.end_date }}</span></div>
+        <div class="readonly-field" style="min-width: 220px;"><label>Total Slots:</label> <span>{{ exam.total_slots }}</span></div>
+        <div class="readonly-field" style="min-width: 220px;"><label>Slots with Seating Generated:</label> <span>{{ exam.generated_slots }}</span></div>
+    </div>
+    <div style="height: calc(100vh - 250px); overflow-y: auto; border-radius: 8px; box-shadow: 0 1px 4px #e0e0e0;">
+        <table class="styled-table" style="min-width: 1200px;">
+            <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
+                <tr>
+                    <th>#</th>
+                    <th>Exam Type</th>
+                    <th>Mode</th>
+                    <th>Date</th>
+                    <th>Start Time</th>
+                    <th>End Time</th>
+                    <th>Slot Code</th>
+                    <th>Room Name</th>
+                    <th>Actual Cap</th>
+                    <th>Assigned Cap</th>
+                    <th>Invigilator IDs</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in slot_rows %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ row.exam_type }}</td>
+                    <td>{{ row.mode }}</td>
+                    <td>{{ row.exam_date }}</td>
+                    <td>{{ row.start_time }}</td>
+                    <td>{{ row.end_time }}</td>
+                    <td>{{ row.slot_code }}</td>
+                    <td>{{ row.room_name }}</td>
+                    <td>{{ row.actual_cap }}</td>
+                    <td>{{ row.assigned_cap }}</td>
+                    <td>
+                        {% for id in row.invigilator_ids %}
+                            <span>{{ id }}</span>{% if not forloop.last %}, {% endif %}
+                        {% endfor %}
+                    </td>
+                    <td>
+                        <a href="{% url 'operations:seatingplan' %}?slot_id={{ row.slot_id }}&room_id={{ row.room_id }}" class="btn btn-primary">View</a>
+                        <a href="#" class="btn btn-secondary">Print</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="12">No room allocations found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+<!-- Remove Seating Plan Popup and JS -->
+{% endblock %}

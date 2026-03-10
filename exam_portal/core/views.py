@@ -6,10 +6,10 @@ import csv
 from django.core.files.storage import default_storage
 from masters.models import Department, Program
 from django.contrib.auth import get_user_model
-from django.contrib.auth.decorators import login_required
 import re
 from django.contrib.auth.hashers import make_password
 from django.db import transaction
+from operations.models import StudentExamMap, Exam, ExamSlot, Room
 
 @login_required(login_url='/accounts/login/')
 @require_GET
@@ -671,3 +671,52 @@ def upload_users(request):
 @login_required(login_url='/accounts/login/')
 def student_dashboard(request):
     return render(request, "core/student_dashboard.html", {"user": request.user})
+
+@login_required(login_url='/accounts/login/')
+def student_exams(request):
+    user = request.user
+    student_id = getattr(user, 'student_profile', None)
+    if not student_id:
+        return render(request, "operations/student_exam.html", {"exams": []})
+    student_id = user.student_profile.student_id
+    exam_maps = StudentExamMap.objects.filter(student__student_id=student_id).select_related('exam', 'exam__exam_slot', 'exam__exam_slot__examination', 'exam__course')
+    exams = []
+    for smap in exam_maps:
+        exam = smap.exam
+        slot = exam.exam_slot if exam else None
+        exam_name = slot.examination.exam_name if slot and slot.examination else ''
+        exam_date = slot.examination.start_date if slot and slot.examination else ''
+        start_time = slot.start_time if slot else ''
+        end_time = slot.end_time if slot else ''
+        duration = ''
+        if slot and slot.start_time and slot.end_time:
+            from datetime import datetime, timedelta
+            try:
+                st = slot.start_time
+                et = slot.end_time
+                if isinstance(st, str):
+                    st = datetime.strptime(st, '%H:%M:%S').time()
+                if isinstance(et, str):
+                    et = datetime.strptime(et, '%H:%M:%S').time()
+                duration_td = datetime.combine(exam_date, et) - datetime.combine(exam_date, st)
+                total_seconds = duration_td.total_seconds()
+                hours = int(total_seconds // 3600)
+                mins = int((total_seconds % 3600) // 60)
+                duration = f"{hours} hrs {mins} mins"
+            except Exception:
+                duration = ''
+        room_alloc = Room.objects.filter(seatingplan__student_exam=smap).first()
+        exams.append({
+            "exam_name": exam_name,
+            "exam_date": exam_date,
+            "exam_type": slot.exam_type if slot else '',
+            "exam_slot": slot.slot_code if slot else '',
+            "student_university_id": student_id,
+            "course_code": exam.course.course_code if exam and exam.course else '',
+            "course_name": exam.course.course_name if exam and exam.course else '',
+            "room_no": room_alloc.room_code if room_alloc else '',
+            "start_time": start_time,
+            "end_time": end_time,
+            "duration": duration,
+        })
+    return render(request, "operations/student_exam.html", {"exams": exams})

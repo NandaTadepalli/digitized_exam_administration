@@ -68,6 +68,8 @@ class StudentCourse(models.Model):
             models.Index(fields=["student"]),
             models.Index(fields=["course"]),
             models.Index(fields=["academic_year", "semester"]),
+            models.Index(fields=["academic_year"]),
+            models.Index(fields=["semester"]),
         ]
 
 class FacultyCourse(models.Model):

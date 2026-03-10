@@ -30,12 +30,12 @@ def ajax(request):
     # Student Course Registration AJAX
     if data_type == 'coursereg':
         from operations.models import StudentCourse
-        queryset = StudentCourse.objects.select_related('student', 'course').all().order_by('id')
-        # Filters
         course_code = request.GET.get('course', '').strip()
         academic_year = request.GET.get('year', '').strip()
         semester = request.GET.get('semester', '').strip()
         student_id = request.GET.get('student_id', '').strip()
+        search = request.GET.get('search', '').strip().lower()
+        queryset = StudentCourse.objects.select_related('student', 'course').order_by('id')
         if student_id:
             queryset = queryset.filter(student__student_id__iexact=student_id)
         elif search:
@@ -51,7 +51,7 @@ def ajax(request):
             queryset = queryset.filter(academic_year=academic_year)
         if semester:
             queryset = queryset.filter(semester=semester)
-        paginator = Paginator(queryset, 25)
+        paginator = Paginator(queryset, 25)  # Show 25 rows per page
         page_obj = paginator.get_page(page_number)
         rows = []
         for idx, reg in enumerate(page_obj, start=page_obj.start_index()):

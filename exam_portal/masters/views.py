@@ -10,6 +10,7 @@ from django.http import JsonResponse
 import json
 from .models import Batch, Student, Faculty, Room, Department, Course
 from accounts.models import User
+from operations.models import StudentCourse
 
 # Simple batch list view for redirection
 @login_required
@@ -627,7 +628,7 @@ def student_delete(request, pk):
 def faculty(request):
     from .models import Department
     from django.core.paginator import Paginator
-    faculties = Faculty.objects.select_related('user', 'dept').all()
+    faculties = Faculty.objects.select_related('user', 'dept').all().order_by('faculty_id')
     departments = Department.objects.all()
     search = request.GET.get('search', '').strip().lower()
     department = request.GET.get('department', '').strip()
@@ -716,7 +717,7 @@ from django.shortcuts import redirect
 def rooms(request):
     from django.core.paginator import Paginator
     unique_blocks = Room.objects.values_list('block', flat=True).distinct()
-    rooms = Room.objects.all()
+    rooms = Room.objects.all().order_by('room_code')
     search = request.GET.get('search', '').strip().lower()
     block = request.GET.get('block', '').strip()
     capacity_min = request.GET.get('capacity_min', '').strip()
@@ -1102,28 +1103,41 @@ def course_upload(request):
 
     return redirect("masters:courses")
 
-@login_required
+@login_required(login_url='/accounts/login/')
 def coursereg(request):
-    from operations.models import StudentCourse
-    from .models import Course, Student
-    courseregs = StudentCourse.objects.select_related('student', 'course').all()
-    courses = Course.objects.order_by('course_code').all()
-    academic_years = sorted(set(courseregs.values_list('academic_year', flat=True)))
-    semesters = sorted(set(courseregs.values_list('semester', flat=True)), key=str)
-    return render(request, "masters/coursereg.html", {
-        "courseregs": courseregs,
-        "courses": courses,
-        "academic_years": academic_years,
-        "semesters": semesters
-    })
-
-# ===== COURSE REGISTRATION CSV UPLOAD =====
-from operations.models import StudentCourse
-from .models import Student, Course
-from django.db import transaction
+    user = request.user
+    if hasattr(user, 'role') and user.role == 'student':
+        try:
+            student = user.student_profile
+        except Student.DoesNotExist:
+            return render(request, "masters/coursereg.html", {"courseregs": [], "user": user, "base_template": "core/base_student.html"})
+        courseregs = StudentCourse.objects.select_related('student', 'course').filter(student=student)
+        courses = Course.objects.order_by('course_code').all()
+        academic_years = sorted(set(courseregs.values_list('academic_year', flat=True)))
+        semesters = sorted(set(courseregs.values_list('semester', flat=True)), key=str)
+        return render(request, "masters/coursereg.html", {
+            "courseregs": courseregs,
+            "courses": courses,
+            "academic_years": academic_years,
+            "semesters": semesters,
+            "user": user,
+            "base_template": "core/base_student.html"
+        })
+    else:
+        courseregs = StudentCourse.objects.select_related('student', 'course').all()
+        courses = Course.objects.order_by('course_code').all()
+        academic_years = sorted(set(courseregs.values_list('academic_year', flat=True)))
+        semesters = sorted(set(courseregs.values_list('semester', flat=True)), key=str)
+        return render(request, "masters/coursereg.html", {
+            "courseregs": courseregs,
+            "courses": courses,
+            "academic_years": academic_years,
+            "semesters": semesters,
+            "user": user,
+            "base_template": "core/base_admin.html"
+        })
 
 @login_required
-
 def coursereg_upload(request):
     if request.method == "POST" and request.FILES.get("csv_file"):
         csv_file = request.FILES["csv_file"]

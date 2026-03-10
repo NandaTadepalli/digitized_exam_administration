@@ -1,3 +1,58 @@
+.course-summary-table {
+  width: 100%;
+  align-items: center;
+  border-collapse: collapse;
+  font-size: 1rem;
+  min-width: 220px;
+  max-width: 320px;
+}
+.course-summary-table th {
+  background: #e0e7ef;
+  color: #1E3A5F;
+  font-weight: 600;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  text-align: left;
+}
+.course-summary-table td {
+  border: 1px solid #cbd5e1;
+  padding: 8px 10px;
+  text-align: left;
+  color: #1E3A5F;
+}
+.course-summary-table tr:nth-child(even) {
+  background: #f1f5f9;
+}
+/* Responsive seating table container */
+.seating-table-responsive {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: auto;
+  margin-bottom: 24px;
+}
+.seating-table {
+  margin-top: 10px;
+  min-width: 600px;
+  max-width: 100%;
+  border-collapse: collapse;
+}
+.seating-table th, .seating-table td {
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  text-align: center;
+  font-size: 1rem;
+}
+.seating-header {
+  background: #f1f5f9;
+  color: #1E3A5F;
+  font-weight: 600;
+}
+.seating-cell {
+  background: #fff;
+}
+.seating-empty {
+  background: #f8fafc;
+}
 .exam-status-generate {
   background: #ffe5b2 !important;
   color: #b45309 !important;
@@ -36,10 +91,27 @@
   letter-spacing: 0.01em;
   margin-bottom: 1.5em;
 }
+
 .exam-status-available .status-icon,
 .exam-status-pending .status-icon {
   margin-left: 5px;
   margin-right: 0;
+  display: inline-flex;
+  vertical-align: middle;
+}
+
+/* Tick icon for completed status */
+.status-tick svg {
+  display: inline-block;
+  vertical-align: middle;
+  width: 17px;
+  height: 17px;
+}
+.status-tick {
+  margin-left: 5px;
+  margin-right: 0;
+  border-radius: 50%;
+  background: transparent;
 }
 
 .dashboard-popup-table-wrapper {
@@ -57,7 +129,7 @@
 .dashboard-popup-table {
   width: 100%;
   border-collapse: collapse;
-  font-family: 'Poppins', sans-serif;
+  font-family: 'Poppins', Arial, Helvetica, sans-serif;
   font-size: 1.01rem;
   table-layout: fixed;
 }
@@ -715,8 +787,22 @@ a img {
   flex-shrink: 0;
 }
 
+.seating-controls{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  background: #f8fafc;
+  border-radius: 12px;
+  margin-bottom: 5px;
+  top: 0;
+  background-color: #f8fafc;
+  padding: 10px 0;
+  z-index: 10;
+  box-shadow: 0px 2px 8px rgba(30,58,95,0.08);
+  flex-shrink: 0;
+} 
+
 .controls-1 {
-  position: sticky;
   top: 0;
   background-color: #f8fafc;
   padding: 10px 0;
@@ -899,7 +985,7 @@ table tbody tr td li {
 
 .view-page .action-link, .control-btn, .action-link {
   display: inline-block;
-  margin-top: 20px;
+  margin-top: 15px;
   background: #1E3A5F;
   color: #fff;
   padding: 6px 16px;
@@ -1502,5 +1588,146 @@ table tbody tr td li {
   margin-right: 6px;
   font-size: 1.1em;
   display: inline-block;
+}
+
+/* Exam Cards Styles */
+.exam-cards-wrapper {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    margin-top: 24px;
+}
+.exam-card {
+    background: #f5f7fa;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(30,58,95,0.08);
+    padding: 18px 24px;
+    min-width: 260px;
+    max-width: 340px;
+    flex: 1 1 260px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+.exam-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    position: relative;
+}
+.exam-name {
+    font-size: 18px;
+    font-weight: 600;
+    color: #2563eb;
+}
+.exam-date {
+    font-size: 15px;
+    color: #374151;
+    font-weight: 500;
+}
+.exam-card-body div {
+    margin-bottom: 6px;
+    font-size: 15px;
+    color: #2C4C70;
+}
+
+/* Exam Status Indicator Styles */
+.exam-card {
+    position: relative;
+}
+.exam-status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 12px;
+    border-radius: 16px;
+    border: 2px solid #ef4444; /* default to red for pending/upcoming */
+    margin-left: auto;
+}
+.exam-status-indicator .status-dot {
+    height: 12px;
+    width: 12px;
+    border-radius: 50%;
+    display: inline-block;
+}
+.exam-status-indicator.completed {
+    border-color: #22c55e; /* green for completed */
+}
+.exam-status-indicator.upcoming {
+    border: 3px solid;
+    border-image: linear-gradient(270deg, #ef4444, #ffb3b3, #ff4d4d, #ef4444) 1;
+    background: linear-gradient(90deg, #fff0f0 0%, #ffeaea 100%);
+    box-shadow: 0 0 24px 6px #ffb3b3, 0 0 40px 10px #ff4d4d33;
+    animation: blink-border 1s linear infinite, gradient-border 3s linear infinite;
+    position: relative;
+    overflow: visible;
+}
+
+@keyframes gradient-border {
+  0% { border-image-source: linear-gradient(270deg, #ef4444, #ffb3b3, #ff4d4d, #ef4444); }
+  100% { border-image-source: linear-gradient(270deg, #ff4d4d, #ef4444, #ffb3b3, #ff4d4d); }
+}
+
+@keyframes blink-border {
+  0%, 100% { box-shadow: 0 0 12px 2px #ffb3b3; border-color: #ef4444; }
+  50% { box-shadow: 0 0 24px 6px #ff4d4d; border-color: #ff4d4d; }
+}
+
+.status-dot.completed {
+    background: #22c55e;
+}
+.status-dot.upcoming {
+    background: #ef4444;
+    animation: blink-dot 1s linear infinite;
+    box-shadow: 0 0 16px 4px #ffb3b3, 0 0 32px 8px #ff4d4d44;
+    position: relative;
+    z-index: 2;
+  }
+
+  .status-dot.upcoming::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(255, 77, 77, 0.18);
+    z-index: 1;
+    animation: pulse-ring 1.2s infinite cubic-bezier(0.66, 0, 0, 1);
+  }
+
+  @keyframes pulse-ring {
+    0% { transform: translate(-50%, -50%) scale(0.7); opacity: 0.7; }
+    70% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.2; }
+    100% { transform: translate(-50%, -50%) scale(1.4); opacity: 0; }
+  }
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes label-color {
+  0%, 100% { color: #fff; }
+  50% { color: #ffeaea; }
+}
+
+@keyframes blink-dot {
+  0%, 100% { background: #ef4444; box-shadow: 0 0 8px 2px #ffb3b3; }
+  50% { background: #ff4d4d; box-shadow: 0 0 16px 4px #ff4d4d; }
+}
+
+.status-label {
+    font-weight: 600;
+    font-size: 14px;
+}
+.status-label.completed {
+    color: #22c55e;
+}
+.status-label.upcoming {
+    color: #ef4444;
 }
 

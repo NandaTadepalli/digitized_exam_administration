@@ -6,6 +6,7 @@ app_name = "operations"
 urlpatterns = [
     path("attendence/", views.attendence, name="attendence"),
     path("exams/", views.exams, name="exams"),
+    path("room_alloc_view/", views.room_alloc_view, name="room_alloc_view"),
     path("roomalloc/", views.roomalloc, name="roomalloc"),
     path("roomalloc/content/", views.roomalloc_content, name="roomalloc_content"),
     path("report/", views.report, name="report"),
@@ -22,4 +23,7 @@ urlpatterns = [
     path("ajax/slot-courses/", ajax.ajax_slot_courses, name="ajax_slot_courses"),
     path("ajax/slot-rooms/", ajax.ajax_slot_rooms, name="ajax_slot_rooms"),
     path("ajax/slot-faculty/", ajax.ajax_slot_faculty, name="ajax_slot_faculty"),
+    path("ajax/generate-seating-plan/", views.ajax_generate_seating_plan, name="ajax_generate_seating_plan"),
+    path("ajax/seating-plan/", views.ajax_seating_plan, name="ajax_seating_plan"),
+    path("seatingplan/", views.seatingplan, name="seatingplan"),
 ]

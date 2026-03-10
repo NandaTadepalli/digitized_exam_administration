@@ -1,3 +1,54 @@
+// ========== Seating Plan Coloring ========== 
+document.addEventListener('DOMContentLoaded', function () {
+    var seatingTable = document.querySelector('.seating-table');
+    if (!seatingTable) return;
+    // Build color palette
+    function getColorPalette(n) {
+        // Brighter pastel palette
+        var palette = [
+            '#90caf9', '#ffd54f', '#ffb74d', '#81c784', '#f06292', '#9575cd', '#4dd0e1', '#d4e157', '#ffb300', '#64b5f6',
+            '#e0e0e0', '#f8bbd0', '#ce93d8', '#ba68c8', '#ff8a65', '#aed581', '#dce775', '#fff176', '#80deea', '#fff59d'
+        ];
+        if (n <= palette.length) return palette.slice(0, n);
+        // If more, generate random bright pastel colors
+        var extra = [];
+        for (var i = 0; i < n - palette.length; i++) {
+            var r = Math.floor(Math.random() * 120) + 135;
+            var g = Math.floor(Math.random() * 120) + 135;
+            var b = Math.floor(Math.random() * 120) + 135;
+            extra.push('rgb(' + r + ',' + g + ',' + b + ')');
+        }
+        return palette.concat(extra);
+    }
+    // Collect all course codes
+    var courseCodes = new Set();
+    seatingTable.querySelectorAll('td.seating-cell').forEach(function(cell) {
+        var courseDiv = cell.querySelector('.seating-course');
+        if (courseDiv && courseDiv.textContent.trim()) {
+            courseCodes.add(courseDiv.textContent.trim());
+        }
+    });
+    var codeList = Array.from(courseCodes);
+    var colorMap = {};
+    var palette = getColorPalette(codeList.length);
+    codeList.forEach(function(code, idx) {
+        colorMap[code] = palette[idx];
+    });
+    // Color cells
+    seatingTable.querySelectorAll('td.seating-cell').forEach(function(cell) {
+        var courseDiv = cell.querySelector('.seating-course');
+        if (courseDiv && courseDiv.textContent.trim()) {
+            var code = courseDiv.textContent.trim();
+            cell.style.backgroundColor = colorMap[code];
+            cell.style.color = '#fff';
+        } else {
+            // Empty cell: mark with '-' and brighter light red background
+            cell.innerHTML = '<span style="color:#b71c1c;font-weight:bold;font-size:18px">-</span>';
+            cell.style.backgroundColor = '#ffcdd2';
+            cell.style.color = '#b71c1c';
+        }
+    });
+});
 // ========== Room Allocation: Dynamic Allocated Capacity ========== 
 document.addEventListener('DOMContentLoaded', function () {
             // Helper to show popup message at top right
@@ -27,17 +78,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.addEventListener('mousedown', dismissPopup);
             }
         // Prevent allocation if cap not reached
-        var allocationForm = document.querySelector('.rooms-table-section form');
-        if (allocationForm) {
-            allocationForm.addEventListener('submit', function(e) {
-                let required = parseInt(requiredCap.textContent) || 0;
-                let allocated = parseInt(allocatedCap.textContent) || 0;
-                if (allocated < required) {
-                    e.preventDefault();
-                    showPopupMessage('Cannot allocate: Allocated capacity is less than required.<br>Please select more rooms to meet the required capacity.', 'error');
-                }
-            });
-        }
+        // var allocationForm = document.querySelector('.rooms-table-section form');
+        // if (allocationForm) {
+        //     allocationForm.addEventListener('submit', function(e) {
+        //         let required = parseInt(requiredCap.textContent) || 0;
+        //         let allocated = parseInt(allocatedCap.textContent) || 0;
+        //         if (allocated < required) {
+        //             e.preventDefault();
+        //             showPopupMessage('Cannot allocate: Allocated capacity is less than required.<br>Please select more rooms to meet the required capacity.', 'error');
+        //         }
+        //     });
+        // }
     var requiredCap = document.getElementById('required-capacity-display');
     var allocatedCap = document.getElementById('allocated-capacity-display');
     var roomCheckboxes = document.querySelectorAll('input[name="selected_rooms"]');
@@ -218,7 +269,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 // --- Course Registration Search, Autocomplete, Table, Print, Download, Pagination ---
-let courseregStudentIdList = [];
+var courseregStudentIdList = [];
 function courseregFetchStudentIdAutocomplete(query) {
     fetch(`/masters/ajax/?type=student-id-autocomplete&q=${encodeURIComponent(query)}`)
         .then(resp => resp.json())
@@ -326,12 +377,12 @@ function courseregLoadCourseRegDataByStudentId(studentId, page = 1) {
             if (document.getElementById('coursereg-pagination')) document.getElementById('coursereg-pagination').innerHTML = data.pagination_html || '';
         });
 }
-const studentSearchElem = document.getElementById('studentSearch');
-const searchStudentLinkElem = document.getElementById('searchStudentLink');
-const resetStudentSearchLinkElem = document.getElementById('resetStudentSearchLink');
-const courseregPaginationElem = document.getElementById('coursereg-pagination');
-const printCourseRegBtnElem = document.getElementById('printCourseRegBtn');
-const downloadCourseRegBtnElem = document.getElementById('downloadCourseRegBtn');
+var studentSearchElem = document.getElementById('studentSearch');
+var searchStudentLinkElem = document.getElementById('searchStudentLink');
+var resetStudentSearchLinkElem = document.getElementById('resetStudentSearchLink');
+var courseregPaginationElem = document.getElementById('coursereg-pagination');
+var printCourseRegBtnElem = document.getElementById('printCourseRegBtn');
+var downloadCourseRegBtnElem = document.getElementById('downloadCourseRegBtn');
 if (studentSearchElem) {
     studentSearchElem.addEventListener('input', function () {
         courseregFetchStudentIdAutocomplete(this.value);
@@ -930,13 +981,13 @@ function fetchExamSlotsAjax() {
                     let statusCell = '';
                     const schedUrl = `/ops/exam-scheduling/${slot.id}/`;
                     if (slot.assignment_status === 'Assigned') {
-                        statusCell = `<td><a href="${schedUrl}" class="slot-schedule-link" title="Go to scheduling"><span class=\"exam-status exam-status-available\">Assigned <img src='https://img.icons8.com/?size=100&id=79211&format=png&color=000000' alt='Assigned' class='status-icon'></span></a></td>`;
+                        statusCell = `<td><a href="${schedUrl}" class="slot-schedule-link" title="Go to scheduling"><span class="exam-status exam-status-available">Assigned <img src='https://img.icons8.com/?size=100&id=79211&format=png&color=000000' alt='Assigned' class='status-icon'></span></a></td>`;
                     } else {
                         statusCell = `<td><a href="${schedUrl}" class="slot-schedule-link" title="Go to scheduling"><span class="exam-status exam-status-pending">Pending <img src='https://img.icons8.com/?size=100&id=rKEYSosGdrkP&format=png&color=000000' alt='Pending' class='status-icon'></span></a></td>`;
                     }
                     // Add edit and delete links
-                    const editLink = `<a href=\"#\" class=\"edit-slot-btn\" data-slot-id=\"${slot.id}\" title=\"Edit\"><img src=\"https://img.icons8.com/?size=100&id=kzmsQM0bM3Bl&format=png&color=000000\" alt=\"Edit Slot\" class=\"icon-edit\"></a>`;
-                    const deleteLink = `<a href=\"#\" class=\"delete-slot-btn\" data-slot-id=\"${slot.id}\" data-slot-date=\"${slot.exam_date}\" data-slot-time=\"${slot.start_time}-${slot.end_time}\" data-slot-code=\"${slot.slot_code}\"><img src=\"https://img.icons8.com/?size=100&id=99971&format=png&color=000000\" alt=\"Delete Slot\" class=\"icon-delete\"></a>`;
+                    const editLink = `<a href="#" class="edit-slot-btn" data-slot-id="${slot.id}" title="Edit"><img src="https://img.icons8.com/?size=100&id=kzmsQM0bM3Bl&format=png&color=000000" alt="Edit Slot" class="icon-edit"></a>`;
+                    const deleteLink = `<a href="#" class="delete-slot-btn" data-slot-id="${slot.id}" data-slot-date="${slot.exam_date}" data-slot-time="${slot.start_time}-${slot.end_time}" data-slot-code="${slot.slot_code}"><img src="https://img.icons8.com/?size=100&id=99971&format=png&color=000000" alt="Delete Slot" class="icon-delete"></a>`;
                     // Badge for courses
                     // Show badge as 'count : X', but use red for 0, green for >0
                     let badgeClass = slot.course_count > 0 ? 'badge-courses badge-courses-positive' : 'badge-courses badge-courses-zero';
@@ -959,20 +1010,24 @@ function fetchExamSlotsAjax() {
                     }
                     // Determine status for new column
                     let newStatusCell = '';
-                    let allAssigned = false;
-                    if (
+                    // Show Completed if generated and all assigned
+                    if (slot.is_generated && slot.all_assigned) {
+                        newStatusCell = `<td><span class="exam-status exam-status-available">Completed <span class='status-icon status-tick' aria-label='Completed'><svg viewBox="0 0 16 16" width="17" height="17" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="8" fill="#e6f9e6"/><path d="M4.5 8.5L7 11L11.5 6.5" stroke="#1a7f1a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span></span></td>`;
+                    } else if (slot.is_generated) {
+                        // If generated but not all assigned, show Update
+                        newStatusCell = `<td><a href="#" class="slot-status-link" title="Status"><span class="exam-status exam-status-available">Update <img src='https://img.icons8.com/?size=100&id=11841&format=png&color=ff9900' alt='Update' class='status-icon'></span></a></td>`;
+                    } else if (
                         roomBadge.includes('exam-status-available') &&
                         facultyBadge.includes('exam-status-available') &&
                         badgeClass.includes('badge-courses-positive')
+                        && !slot.is_generated
                     ) {
-                        allAssigned = true;
-                    }
-                    if (allAssigned) {
+                        // Only show Generate if all assigned and no backend data
                         newStatusCell = `<td><a href="#" class="slot-status-link" title="Status"><span class="exam-status exam-status-generate">Generate <img src='https://img.icons8.com/?size=100&id=11841&format=png&color=ff9900' alt='Generate' class='status-icon'></span></a></td>`;
                     } else {
                         newStatusCell = `<td><a href="#" class="slot-status-link" title="Status"><span class="exam-status exam-status-pending">Pending <img src='https://img.icons8.com/?size=100&id=rKEYSosGdrkP&format=png&color=000000' alt='Pending' class='status-icon'></span></a></td>`;
                     }
-                    var row = `<tr>
+                    var row = `<tr data-slot-id="${slot.id}">
                         <td>${slot.exam_type || ''}</td>
                         <td>${slot.mode || ''}</td>
                         <td>${slot.exam_date || ''}</td>
@@ -999,10 +1054,11 @@ function fetchExamSlotsAjax() {
         document.addEventListener('click', function(e) {
             const statusLink = e.target.closest('.slot-status-link');
             if (statusLink) {
-                const statusSpan = statusLink.querySelector('.exam-status-pending');
-                if (statusSpan) {
+                const statusSpanGenerate = statusLink.querySelector('.exam-status-generate');
+                const statusSpanPending = statusLink.querySelector('.exam-status-pending');
+                const row = statusLink.closest('tr');
+                if (statusSpanPending) {
                     let missing = [];
-                    const row = statusLink.closest('tr');
                     if (row) {
                         // Check room assignment
                         const roomCell = row.children[9];
@@ -1020,8 +1076,156 @@ function fetchExamSlotsAjax() {
                         msg += missing.map(item => `<span style='display:block;margin-left:1em;'>${item}</span>`).join('');
                     }
                     showPopupMessage(msg, 'warning');
+                } else if (statusSpanGenerate) {
+                    // Get slot_id from row attribute
+                    const slotId = row.getAttribute('data-slot-id');
+                    if (!slotId) {
+                        showPopupMessage('Slot ID not found for generation.', 'error');
+                        return;
+                    }
+                    // Disable Generate button
+                    statusLink.classList.add('disabled');
+                    statusLink.style.pointerEvents = 'none';
+                    // Show modal spinner popup in center
+                    showSpinnerModal('Generating seating plan... Please wait.<br><span style="color:#b30000;font-weight:600;">Do not close or refresh the page until completed.</span><br><span id="est-time" style="color:#2563eb;font-weight:500;">Estimated time: 10-20 seconds</span>');
+                    let timer = 0;
+                    let estTime = 20; // Estimated max time in seconds
+                    const estTimeElem = document.getElementById('est-time');
+                    const interval = setInterval(() => {
+                        timer++;
+                        if (estTimeElem) {
+                            estTimeElem.textContent = `Estimated time: ${Math.max(estTime-timer, 1)} seconds`;
+                        }
+                    }, 1000);
+                    fetch('/ops/ajax/generate-seating-plan/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'X-CSRFToken': (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || ''
+                        },
+                        body: 'slot_id=' + encodeURIComponent(slotId)
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        clearInterval(interval);
+                        statusLink.classList.remove('disabled');
+                        statusLink.style.pointerEvents = '';
+                        const statusCell = row.children[11]; // newStatusCell
+                        if (data.status === 'success' || data.status === 'assigned') {
+                            closeSpinnerModal();
+                            statusCell.innerHTML = `<span class="exam-status exam-status-available exam-status-assigned">Assigned <img src='https://img.icons8.com/?size=100&id=79211&format=png&color=000000' alt='Assigned' class='status-icon'></span>`;
+                            if (statusCell.querySelector('.exam-status')) {
+                                statusCell.querySelector('.exam-status').classList.remove('slot-status-link');
+                                statusCell.querySelector('.exam-status').style.cursor = 'default';
+                            }
+                            showPopupMessage('Seating plan and invigilation already completed! Status updated to Assigned.', 'success');
+                        } else if (data.status === 'update') {
+                            // Show missing assignments in spinner modal
+                            let missing = [];
+                            if (roomBadge && roomBadge.includes('Pending')) missing.push('Room Assignment');
+                            if (facultyBadge && facultyBadge.includes('Pending')) missing.push('Faculty Assignment');
+                            if (badgeClass && badgeClass.includes('badge-courses-zero')) missing.push('Course Assignment');
+                            let msg = 'Some assignments are missing. Please update seating/invigilation.';
+                            if (missing.length > 0) {
+                                msg += '<br><span style="color:#b30000;font-weight:600;">Missing/Incomplete:</span><br>';
+                                msg += missing.map(item => `<span style='display:block;margin-left:1em;'>${item}</span>`).join('');
+                            }
+                            showSpinnerModal(msg + '<br><button id="closeSpinnerBtn" style="margin-top:1em;padding:0.5em 1.2em;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:1em;cursor:pointer;">Close</button>');
+                            // Add close button handler
+                            setTimeout(() => {
+                                const closeBtn = document.getElementById('closeSpinnerBtn');
+                                if (closeBtn) closeBtn.onclick = () => closeSpinnerModal();
+                            }, 100);
+                            statusCell.innerHTML = `<a href="#" class="slot-status-link" title="Status"><span class="exam-status exam-status-available">Update <img src='https://img.icons8.com/?size=100&id=11841&format=png&color=ff9900' alt='Update' class='status-icon'></span></a>`;
+                        } else {
+                            closeSpinnerModal();
+                            showPopupMessage('Error: ' + (data.error || 'Unknown error'), 'error');
+                        }
+                    })
+                    .catch(() => {
+                        clearInterval(interval);
+                        closeSpinnerModal();
+                        statusLink.classList.remove('disabled');
+                        statusLink.style.pointerEvents = '';
+                        showPopupMessage('Error generating seating plan.', 'error');
+                    });
+                // Spinner Modal Functions
+                function showSpinnerModal(message) {
+                    let modal = document.getElementById('spinner-modal');
+                    if (!modal) {
+                        modal = document.createElement('div');
+                        modal.id = 'spinner-modal';
+                        modal.innerHTML = `
+                            <div class="spinner-modal-content">
+                                <span class="spinner"></span>
+                                <div class="spinner-modal-text">${message}</div>
+                            </div>
+                        `;
+                        document.body.appendChild(modal);
+                    } else {
+                        modal.querySelector('.spinner-modal-text').innerHTML = message;
+                        modal.style.display = 'flex';
+                    }
+                }
+                function closeSpinnerModal() {
+                    let modal = document.getElementById('spinner-modal');
+                    if (modal) modal.style.display = 'none';
+                }
+                // Spinner Modal CSS
+                const spinnerModalStyle = document.createElement('style');
+                spinnerModalStyle.innerHTML = `
+                #spinner-modal {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100vw;
+                    height: 100vh;
+                    background: rgba(30,58,95,0.18);
+                    z-index: 99999;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .spinner-modal-content {
+                    background: #fff;
+                    border-radius: 16px;
+                    box-shadow: 0 8px 32px rgba(30,58,95,0.18);
+                    padding: 2.5em 2em;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    min-width: 340px;
+                    max-width: 90vw;
+                }
+                .spinner-modal-text {
+                    margin-top: 1.2em;
+                    font-size: 1.18em;
+                    color: #1E3A5F;
+                    text-align: center;
+                    font-family: 'Poppins', sans-serif;
+                }
+                `;
+                document.head.appendChild(spinnerModalStyle);
                 }
             }
+        // Spinner CSS
+        const spinnerStyle = document.createElement('style');
+        spinnerStyle.innerHTML = `
+        .spinner {
+            width: 22px;
+            height: 22px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #2563eb;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        `;
+        document.head.appendChild(spinnerStyle);
         });
     function showPopupMessage(msg, type = 'error') {
         let popup = document.getElementById('popup-messages');
@@ -1140,7 +1344,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function pendingBadge() {
         return `<span class="exam-status exam-status-pending" style="background:#fff3cd;color:#856404;padding:2px 0px 2px 10px;border-radius:6px;display:inline-flex;align-items:center">
-            Pending <img src=\"https://img.icons8.com/?size=100&id=rKEYSosGdrkP&format=png&color=000000\" alt="Pending" class="status-icon" style="width:1.2em;height:1.2em;vertical-align:middle;margin-left:6px;">
+            Pending <img src="https://img.icons8.com/?size=100&id=rKEYSosGdrkP&format=png&color=000000" alt="Pending" class="status-icon" style="width:1.2em;height:1.2em;vertical-align:middle;margin-left:6px;">
         </span>`;
     }
     function availableBadge(count) {
@@ -1149,6 +1353,14 @@ document.addEventListener('DOMContentLoaded', function () {
         </span>`;
     }
     window.fetchExaminations = function fetchExaminations(page = 1) {
+        // Always clear and hide deleteExamModal before reload
+        const modal = document.getElementById('deleteExamModal');
+        if (modal) {
+            modal
+            document.getElementById('deleteExamWarning').innerHTML = '';
+            document.getElementById('deleteExamDetails').innerHTML = '';
+            document.getElementById('deleteExamId').value = '';
+        }
         fetch(`/ops/ajax/examinations/?page=${page}`)
             .then(resp => resp.json())
             .then(data => {
@@ -1290,7 +1502,12 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
-                    document.getElementById('deleteExamModal').style.display = 'none';
+                    // Hide modal and clear its content
+                    const modal = document.getElementById('deleteExamModal');
+                    modal.style.display = 'none';
+                    document.getElementById('deleteExamWarning').innerHTML = '';
+                    document.getElementById('deleteExamDetails').innerHTML = '';
+                    document.getElementById('deleteExamId').value = '';
                     alert('Examination and all related slots and exams deleted successfully.');
                     fetchExaminations();
                 } else {
@@ -1801,8 +2018,10 @@ function downloadStudentCSV() {
         .map(th => `"${th.textContent.trim()}"`)
         .join(',');
     const data = rows.map(row => {
-        const cells = Array.from(row.querySelectorAll('td'));
-        return cells.slice(0, -1).map(td => `"${td.textContent.trim()}"`).join(',');
+        return Array.from(row.querySelectorAll('td'))
+            .slice(0, -1)
+            .map(td => `"${td.textContent.trim()}"`)
+            .join(',');
     });
     const csvContent = [headers, ...data].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });

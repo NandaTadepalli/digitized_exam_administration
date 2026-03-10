@@ -1,0 +1,40 @@
+{% extends "core/base_student.html" %}
+{% block content %}
+<div class="pages-main">
+    <h1 class="pages-main-head">My Exams</h1>
+    <div class="exam-cards-wrapper">
+        {% if exams %}
+            {% for exam in exams %}
+            <div class="exam-card" style="position:relative;">
+                <div class="exam-card-header">
+                    <span class="exam-name">{{ exam.exam_name }}</span>
+                    <div class="exam-status-indicator">
+                    {% if exam.status == 'completed' %}
+                        <span class="status-dot completed"></span>
+                        <span class="status-label completed">Completed</span>
+                    {% else %}
+                        <span class="status-dot upcoming"></span>
+                        <span class="status-label upcoming">Upcoming</span>
+                    {% endif %}
+                </div>
+                </div>
+                <div class="exam-card-body">
+                    <div><strong>Student University Id :</strong> {{ exam.student_university_id }}</div>
+                    <div><strong>Exam Date :</strong> {{ exam.exam_date }}</div>
+                    <div><strong>Exam Type :</strong> {{ exam.exam_type }}</div>
+                    <div><strong>Course Code :</strong> {{ exam.course_code }}</div>
+                    <div><strong>Course Name:</strong> {{ exam.course_name }}</div>
+                    <div><strong>Room No :</strong> {{ exam.room_no }}</div>
+                    <div><strong>Time :</strong> {{ exam.start_time }} - {{ exam.end_time }}</div>
+                    <div><strong>Exam Slot :</strong> {{ exam.exam_slot }}</div>
+                    <div><strong>Duration :</strong> {{ exam.duration }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div style="text-align:center;color:#888;padding:32px;">No exams found for this student.</div>
+        {% endif %}
+    </div>
+</div>
+<!-- Styles moved to styles.css -->
+{% endblock %}

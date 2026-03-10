@@ -168,8 +168,8 @@
                 </tbody>
             </table>
             <!-- Delete Examination Modal -->
-            <div id="deleteExamModal" class="modal" style="display:none;position:fixed;z-index:1000;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.4);align-items:center;justify-content:center;">
-                <div class="modal-content" style="background:#fff;padding:2em;max-width:500px;border-radius:8px;position:relative;">
+            <div id="deleteExamModal" class="modal" style="display:none;position:fixed;z-index:1000;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;">
+                <div class="modal-content" style="background:#fff;padding:2em;max-width:500px;border-radius:8px;">
                     <span id="closeDeleteExamModal" style="position:absolute;top:10px;right:16px;font-size:1.5em;cursor:pointer;">&times;</span>
                     <h2 style="margin-top:0;">Confirm Deletion</h2>
                     <div id="deleteExamWarning" style="color:#b30000;margin-bottom:1em;"></div>
@@ -186,15 +186,23 @@
             <div id="examination-pagination" class="pagination"></div>
         </div>
             <script>
-            // Helper to format date as date-month(short)-year
-            function formatDateDMY(dateStr) {
-                if (!dateStr) return '';
-                const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-                const d = new Date(dateStr);
-                if (isNaN(d)) return dateStr;
-                return `${d.getDate().toString().padStart(2, '0')}-${months[d.getMonth()]}-${d.getFullYear()}`;
-            }
-            // Patch your JS table rendering to use formatDateDMY for start_date and end_date columns
+                // Helper to format date as date-month(short)-year
+                function formatDateDMY(dateStr) {
+                    if (!dateStr) return '';
+                    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                    const d = new Date(dateStr);
+                    if (isNaN(d)) return dateStr;
+                    return `${d.getDate().toString().padStart(2, '0')}-${months[d.getMonth()]}-${d.getFullYear()}`;
+                }
+                // Patch your JS table rendering to use formatDateDMY for start_date and end_date columns
+
+                // Force hide deleteExamModal on page load
+                document.addEventListener('DOMContentLoaded', function() {
+                    var deleteExamModal = document.getElementById('deleteExamModal');
+                    if (deleteExamModal) {
+                        deleteExamModal.style.display = 'none';
+                    }
+                });
             </script>
     </div>
 {% endblock %}
