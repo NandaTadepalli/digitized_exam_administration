@@ -1,102 +1,117 @@
-{% extends "core/base_admin.html" %}
+{% extends base_template %}
 {% load seating_extras %}
 {% block content %}
-<div class="pages-main" style="position:relative;">
+<div class="pages-main relative">
     <h1 class="pages-main-head">Room Seating Plan</h1>
     <div class="seating-controls">
-            <!-- Course summary table -->
-            <div class="readonly-field"><label>Exam Name:</label> <span>{{ exam.exam_name }}</span></div>
-            <div class="readonly-field"><label>Room Name:</label> <span>{{ room.room_code }}</span></div>
-            <div class="readonly-field"><label>Slot Code:</label> <span>{{ slot.slot_code }}</span></div>
-            <div class="readonly-field"><label>Date:</label> <span>{{ slot.exam_date }}</span></div>
-            <div class="readonly-field"><label>Start Time:</label> <span>{{ slot.start_time }}</span></div>
-            <div class="readonly-field"><label>End Time:</label> <span>{{ slot.end_time }}</span></div>
+        <!-- Course summary table -->
+        <div class="readonly-field"><label>Exam Name:</label> <span>{{ exam.exam_name }}</span></div>
+        <div class="readonly-field"><label>Room Name:</label> <span>{{ room.room_code }}</span></div>
+        <div class="readonly-field"><label>Slot Code:</label> <span>{{ slot.slot_code }}</span></div>
+        <div class="readonly-field"><label>Date:</label> <span>{{ slot.exam_date }}</span></div>
+        <div class="readonly-field"><label>Start Time:</label> <span>{{ slot.start_time }}</span></div>
+        <div class="readonly-field"><label>End Time:</label> <span>{{ slot.end_time }}</span></div>
     </div>
-        {% if course_summary or faculty_summary %}
-        <div style="display: flex; gap: 32px; margin-top: 10px;">
-            {% if course_summary %}
-            <div class="course-summary-block">
-                <table class="course-summary-table">
-                    <thead>
-                        <tr>
-                            <th>Course Code</th>
-                            <th>Student Count</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for code, count in course_summary.items %}
-                        <tr>
-                            <td>{{ code }}</td>
-                            <td>{{ count }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% endif %}
-            {% if faculty_summary %}
-            <div class="faculty-summary-block">
-                <table class="course-summary-table">
-                    <thead>
-                        <tr>
-                            <th>Faculty ID</th>
-                            <th>Name</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for fac in faculty_summary %}
-                        <tr>
-                            <td>{{ fac.faculty_id }}</td>
-                            <td>{{ fac.faculty_name }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% endif %}
+    {% if course_summary or faculty_summary %}
+    <div class="seating-summary-flex">
+        {% if course_summary %}
+        <div class="course-summary-block">
+            <table class="course-summary-table">
+                <thead>
+                    <tr>
+                        <th>Course Code</th>
+                        <th>Student Count</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for code, count in course_summary.items %}
+                    <tr>
+                        <td>{{ code }}</td>
+                        <td>{{ count }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
         {% endif %}
-        <div class="seating-table-container">
-            <div class="seating-table-responsive">
-                <table class="seating-table">
-                    <thead>
-                        <tr>
-                            <th class="seating-header">#</th>
-                            {% for col in col_range %}
-                            <th class="seating-header">Col {{ col }}</th>
-                            {% endfor %}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% if row_range and col_range %}
-                            {% for row in row_range %}
-                                {% with row_idx=row|add:'-1' %}
-                                <tr>
-                                    <th class="seating-header">Row {{ row }}</th>
-                                    {% for col in col_range %}
-                                        {% with col_idx=col|add:'-1' row_map=seating_map|get_item:row_idx %}
-                                            {% if row_map and row_map|get_item:col_idx %}
-                                                {% with cell=row_map|get_item:col_idx %}
-                                                    <td class="seating-cell">
-                                                        <div class="seating-student">{{ cell.student_id }}</div>
-                                                        <div class="seating-course">{{ cell.course_code }}</div>
-                                                    </td>
-                                                {% endwith %}
-                                            {% else %}
-                                                <td class="seating-cell seating-empty"></td>
-                                            {% endif %}
-                                        {% endwith %}
-                                    {% endfor %}
-                                </tr>
-                                {% endwith %}
-                            {% endfor %}
-                        {% else %}
-                            <tr><td colspan="{{ col_range|length|add:'1' }}" style="text-align:center;color:#888;padding:32px;">No seating data found for this room and slot.</td></tr>
-                        {% endif %}
-                    </tbody>
-                </table>
-            </div>
+        {% if faculty_summary %}
+        <div class="faculty-summary-block">
+            <table class="course-summary-table">
+                <thead>
+                    <tr>
+                        <th>Faculty ID</th>
+                        <th>Name</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for fac in faculty_summary %}
+                    <tr>
+                        <td>{{ fac.faculty_id }}</td>
+                        <td>{{ fac.faculty_name }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
     </div>
+    {% endif %}
+    <div class="seating-table-container">
+        <div class="seating-table-responsive">
+            <table class="seating-table" id="print-seating-grid">
+                <thead>
+                    <tr>
+                        <th class="seating-header">#</th>
+                        {% for col in col_range %}
+                        <th class="seating-header">Col {{ col }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if row_range and col_range %}
+                    {% for row in row_range %}
+                    {% with row_idx=row|add:'-1' %}
+                    <tr>
+                        <th class="seating-header">Row {{ row }}</th>
+                        {% for col in col_range %}
+                        {% with col_idx=col|add:'-1' row_map=seating_map|get_item:row_idx %}
+                        {% if row_map and row_map|get_item:col_idx %}
+                        {% with cell=row_map|get_item:col_idx %}
+                        <td class="seating-cell">
+                            <div class="seating-student">{{ cell.student_id }}</div>
+                            <div class="seating-course">{{ cell.course_code }}</div>
+                        </td>
+                        {% endwith %}
+                        {% else %}
+                        <td class="seating-cell seating-empty"></td>
+                        {% endif %}
+                        {% endwith %}
+                        {% endfor %}
+                    </tr>
+                    {% endwith %}
+                    {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="{{ col_range|length|add:'1' }}" class="no-seating-box">
+                            No seating data found for this room and slot.</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
+</div>
+
+<script>
+    window.onload = function () {
+        if (window.location.search.includes('print=1')) {
+            // Focus is key for iframe prints
+            window.focus();
+            setTimeout(function () {
+                window.print();
+            }, 500);
+        }
+    };
+</script>
 {% endblock %}

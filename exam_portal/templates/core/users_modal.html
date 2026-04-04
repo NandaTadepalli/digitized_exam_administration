@@ -1,9 +1,9 @@
 {% load static %}
 <h5 class="pages-main-head">Users List</h5>
 <div class="modal-body">
-	<div class="table-responsive" style="max-height: 80vh; overflow-y: auto;">
+	<div class="table-responsive max-h-80vh">
 		<table class="table table-bordered table-striped" id="users-table">
-			<thead style="position: sticky; top: 0; z-index: 2; background: #1E3A5F;">
+			<thead class="sticky-header-1e3">
 				<tr>
 					<th>Username</th>
 					<th>Email</th>
@@ -18,7 +18,7 @@
 					   <th><input type="text" class="users-filter-input" data-field="first_name" placeholder="Filter First Name"></th>
 					   <th><input type="text" class="users-filter-input" data-field="last_name" placeholder="Filter Last Name"></th>
 					   <th><input type="text" class="users-filter-input" data-field="role" placeholder="Filter Role"></th>
-					   <th><input type="text" class="users-filter-input" readonly tabindex="-1" style="background:#f1f5f9;cursor:not-allowed;"></th>
+					   <th><input type="text" class="users-filter-input readonly-f1" readonly tabindex="-1"></th>
 				</tr>
 			</thead>
 			<tbody id="users-table-body">

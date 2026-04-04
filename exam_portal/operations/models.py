@@ -7,6 +7,7 @@ class Examinations(models.Model):
     end_date = models.DateField()
     academic_year = models.CharField(max_length=20, null=True)
     semester = models.CharField(max_length=20,null=True)
+    published = models.BooleanField(default=False)
 
     class Meta:
         db_table = "examinations"
@@ -197,10 +198,6 @@ class InvigilationDuty(models.Model):
             models.UniqueConstraint(
                 fields=["exam_slot", "faculty"],
                 name="uq_faculty_once_per_slot"
-            ),
-            models.UniqueConstraint(
-                fields=["exam_slot", "room"],
-                name="uq_room_once_per_slot"
             )
         ]
 
@@ -228,6 +225,7 @@ class SeatingPlan(models.Model):
 class Attendance(models.Model):
     student_exam = models.OneToOneField(StudentExamMap, on_delete=models.CASCADE)
     marked_by = models.ForeignKey(Faculty, on_delete=models.CASCADE)
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, null=True)
     status = models.CharField(
         max_length=7,
         choices=[("PRESENT", "PRESENT"), ("ABSENT", "ABSENT")]

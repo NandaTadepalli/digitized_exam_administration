@@ -1,0 +1,11 @@
+{% extends base_template %}
+{% load static %}
+{% load seating_extras %}
+{% block content %}
+<div class="pages-main">
+    <a href="{% url 'masters:facultyview_seatingplan' %}" class="back-link" style="display:inline-flex; align-items:center; gap:5px; color:#64748b; text-decoration:none; font-size:14px; margin-bottom:20px;">
+        ← Back to Assignments
+    </a>
+    {% include 'operations/partial_mark_attendance.html' %}
+</div>
+{% endblock %}

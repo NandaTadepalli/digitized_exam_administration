@@ -5,7 +5,7 @@
         <h2>Edit Student ({{ student.student_id }} - {{ student.user.first_name }} {{ student.user.last_name }})</h2>
         <form method="post">
             {% csrf_token %}
-            <p>Student ID: <input type="text" name="student_id" value="{{ student.student_id }}" readonly style="background:#e5e7eb;" /></p>
+            <p>Student ID: <input type="text" name="student_id" value="{{ student.student_id }}" readonly class="readonly-e5" /></p>
             <p>First Name: <input type="text" name="first_name" value="{{ student.user.first_name }}" /></p>
             <p>Last Name: <input type="text" name="last_name" value="{{ student.user.last_name }}" /></p>
             <p>Department:

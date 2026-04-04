@@ -3,11 +3,11 @@
 <h2>Data Conflict Detected</h2>
 <p>The following records in your CSV already exist in the database but do not match exactly. Please review the mismatched data below:</p>
 {% for row, db_row in mismatches %}
-<div class="conflict-block" style="margin-bottom: 32px; border: 1px solid #f59e42; border-radius: 8px; padding: 18px;">
-    <h4 style="margin-bottom: 12px;">Conflict for: <b>{{ row.0 }}</b></h4>
-    <table class="table table-bordered" style="width: 100%;">
+<div class="conflict-block">
+    <h4 class="mb-12">Conflict for: <b>{{ row.0 }}</b></h4>
+    <table class="table table-bordered w-100">
         <thead>
-            <tr style="background: #f8fafc;">
+            <tr class="bg-f8">
                 <th>Field</th>
                 <th>Old Value</th>
                 <th>New Value</th>

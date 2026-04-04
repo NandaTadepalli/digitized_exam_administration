@@ -1,3 +1,9 @@
+import math
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.http import JsonResponse
+
 def ajax_seating_plan(request):
     slot_id = request.GET.get('slot_id')
     room_id = request.GET.get('room_id')
@@ -27,10 +33,14 @@ def seatingplan(request):
                 'faculty_id': duty.faculty.faculty_id,
                 'faculty_name': duty.faculty.faculty_name,
             })
-    seating = SeatingPlan.objects.filter(exam_slot_id=slot_id, room_id=room_id).select_related('student_exam__student', 'student_exam__exam', 'exam_slot', 'room')
+    seating = SeatingPlan.objects.filter(exam_slot_id=slot_id, room_id=room_id).select_related('student_exam__student', 'student_exam__exam', 'exam_slot', 'room').order_by('row_no', 'seat_no')
     slot = ExamSlot.objects.filter(id=slot_id).first()
     room = Room.objects.filter(id=room_id).first()
     exam = slot.examination if slot else None
+
+    # Identify user role
+    is_faculty = request.user.is_authenticated and getattr(request.user, 'role', None) == "faculty"
+
     # Find max row and col
     max_row = 0
     max_col = 0
@@ -45,15 +55,27 @@ def seatingplan(request):
             max_col = col
         if row not in seating_map:
             seating_map[row] = {}
+        
+        # Course info
         course_code = plan.student_exam.exam.course.course_code if plan.student_exam.exam and plan.student_exam.exam.course else ''
+        
         seating_map[row][col] = {
             'student_id': plan.student_exam.student.student_id,
+            'student_name': plan.student_exam.student.student_name if hasattr(plan.student_exam.student, 'student_name') else '',
             'course_code': course_code,
         }
         if course_code:
             course_summary[course_code] = course_summary.get(course_code, 0) + 1
-    row_range = list(range(1, max_row+2))
-    col_range = list(range(1, max_col+2))
+    
+    # Ensure layout boundaries
+    # Use the room's actual boundaries for the grid if available
+    row_range = list(range(1, (room.rows if room else max_row) + 1))
+    col_range = list(range(1, (room.columns if room else max_col) + 1))
+
+    base_template = "core/base_admin.html"
+    if is_faculty:
+        base_template = "core/base_faculty.html"
+    
     return render(request, "operations/seatingplan.html", {
         'exam': exam,
         'room': room,
@@ -63,7 +85,127 @@ def seatingplan(request):
         'col_range': col_range,
         'course_summary': course_summary,
         'faculty_summary': faculty_summary,
+        'base_template': base_template,
+        'is_faculty_view': is_faculty,
     })
+
+@login_required
+def mark_attendance(request):
+    slot_id = request.GET.get('slot_id')
+    room_id = request.GET.get('room_id')
+    from .models import SeatingPlan, InvigilationDuty, Attendance, StudentExamMap, ExamSlot, Room
+    from masters.models import Faculty
+    
+    slot = ExamSlot.objects.filter(id=slot_id).first()
+    room = Room.objects.filter(id=room_id).first()
+    
+    # Get current faculty
+    faculty = Faculty.objects.filter(user=request.user).first()
+    if not faculty:
+        messages.error(request, "Faculty record not found.")
+        return redirect('masters:faculty_dashboard')
+
+    # Get all students in this room
+    seating = SeatingPlan.objects.filter(exam_slot_id=slot_id, room_id=room_id).select_related('student_exam__student', 'student_exam__exam').order_by('row_no', 'seat_no')
+    
+    # Division logic
+    room_duties = InvigilationDuty.objects.filter(exam_slot_id=slot_id, room_id=room_id).order_by('faculty__faculty_id')
+    faculty_count = room_duties.count()
+    
+    my_students = list(seating)
+    if faculty_count > 1:
+        my_duty_idx = -1
+        for i, d in enumerate(room_duties):
+            if d.faculty == faculty:
+                my_duty_idx = i
+                break
+        
+        if my_duty_idx != -1:
+            total_students = len(seating)
+            per_faculty = math.ceil(total_students / faculty_count)
+            start = my_duty_idx * per_faculty
+            end = start + per_faculty
+            my_students = seating[start:end]
+
+    # --- Time-Based Constraint Logic ---
+    from datetime import datetime, timedelta
+    now = datetime.now()
+    exam_date = slot.exam_date
+    start_time = slot.start_time
+    end_time = slot.end_time
+    exam_start = datetime.combine(exam_date, start_time)
+    exam_end = datetime.combine(exam_date, end_time)
+    exam_start_30m = exam_start + timedelta(minutes=30)
+
+    # Check if this faculty has already posted for this slot/room
+    has_posted = Attendance.objects.filter(marked_by=faculty, student_exam__exam__exam_slot=slot, room=room).exists()
+
+    read_only = False
+    if now > exam_end:
+        read_only = True
+        if request.method == 'POST':
+            return JsonResponse({'success': False, 'error': 'Exam has ended. Transcription is no longer allowed.'})
+    
+    if request.method == 'POST':
+        # Enforce the 30-minute rule for first-time posting
+        if not has_posted and now > exam_start_30m:
+             return JsonResponse({'success': False, 'error': 'Initial attendance marking window (first 30 mins) has closed.'})
+        # Prevent posting before exam starts
+        if now < exam_start:
+             return JsonResponse({'success': False, 'error': 'Attendance marking has not started yet.'})
+
+    if request.method == "POST":
+        # Process attendance
+        total_present = 0
+        total_absent = 0
+        
+        for student_plan in my_students:
+            student_exam = student_plan.student_exam
+            # Check for absence
+            is_absent = request.POST.get(f"absent_{student_exam.id}")
+            status = 'ABSENT' if is_absent else 'PRESENT'
+            
+            if status == 'PRESENT':
+                total_present += 1
+            else:
+                total_absent += 1
+
+            Attendance.objects.update_or_create(
+                student_exam=student_exam,
+                defaults={'marked_by': faculty, 'status': status, 'room': room}
+            )
+            # Update map status
+            student_exam.status = 'ATTENDED' if status == 'PRESENT' else 'ABSENT'
+            student_exam.save()
+        
+        if request.GET.get('partial') == '1':
+            return JsonResponse({
+                'success': True,
+                'message': f"Attendance marked for {slot.examination.exam_name} - {slot.slot_code}",
+                'present': total_present,
+                'absent': total_absent,
+                'room_code': room.room_code,
+                'exam_time': f"{slot.start_time.strftime('%I:%M %p')} - {slot.end_time.strftime('%I:%M %p')}"
+            })
+
+        messages.success(request, "Attendance marked successfully.")
+        return redirect('masters:facultyview_seatingplan')
+
+    # Get existing attendance
+    attendance_data = {a.student_exam_id: a.status for a in Attendance.objects.filter(student_exam__in=[s.student_exam for s in my_students])}
+
+    partial = request.GET.get('partial') == '1'
+    template_name = "operations/partial_mark_attendance.html" if partial else "operations/mark_attendance.html"
+
+    return render(request, template_name, {
+        'slot': slot,
+        'room': room,
+        'students': my_students,
+        'attendance_data': attendance_data,
+        'base_template': "core/base_faculty.html",
+        'partial': partial,
+    })
+
 def room_alloc_view(request):
     from .models import Examinations, ExamSlot, RoomAllocation, SeatingPlan, InvigilationDuty
     exam_id = request.GET.get('exam_id')
@@ -76,6 +218,10 @@ def room_alloc_view(request):
             slots = ExamSlot.objects.filter(examination=exam)
             total_slots = slots.count()
             generated_slots = slots.filter(is_generated=True).count()
+            # Calculate total students and assigned students
+            from .models import StudentExamMap, SeatingPlan
+            total_students = StudentExamMap.objects.filter(exam__in=ExamSlot.objects.filter(examination=exam).values_list('exams__id', flat=True)).count()
+            assigned_students = SeatingPlan.objects.filter(exam_slot__in=slots).count()
             exam_data = {
                 'exam_name': exam.exam_name,
                 'academic_year': exam.academic_year,
@@ -84,8 +230,12 @@ def room_alloc_view(request):
                 'end_date': exam.end_date.strftime('%Y-%m-%d'),
                 'total_slots': total_slots,
                 'generated_slots': generated_slots,
+                'total_students': total_students,
+                'assigned_students': assigned_students,
             }
             for slot in slots:
+                slot_total_students = StudentExamMap.objects.filter(exam__exam_slot=slot).count()
+                slot_assigned_students = SeatingPlan.objects.filter(exam_slot=slot).count()
                 room_allocs = RoomAllocation.objects.filter(exam_slot=slot).select_related('room')
                 for room_alloc in room_allocs:
                     room = room_alloc.room
@@ -105,6 +255,8 @@ def room_alloc_view(request):
                         'invigilator_ids': invigilator_ids,
                         'slot_id': slot.id,
                         'room_id': room.id,
+                        'slot_total_students': slot_total_students,
+                        'slot_assigned_students': slot_assigned_students,
                     })
     return render(request, "operations/room_alloc_view.html", {'exam': exam_data, 'slot_rows': slot_rows})
 from django.views.decorators.http import require_POST
@@ -134,13 +286,12 @@ def ajax_generate_seating_plan(request):
         all_seated = seating_count >= students_count and students_count > 0
         all_invigilated = invigilation_count >= rooms.count() and rooms.count() > 0
         if not (all_seated and all_invigilated):
-            # If seating/invigilation data is missing, reset is_generated
+            # If seating/invigilation data is missing, reset is_generated and proceed to generate
             slot.is_generated = False
             slot.save()
         if all_seated and all_invigilated:
             return JsonResponse({'status': 'assigned', 'message': 'Seating and invigilation already completed.'})
-        else:
-            return JsonResponse({'status': 'update', 'message': 'Some assignments missing. Please update.'})
+        # If not all assigned, proceed to generate seating plan
     # If not generated, proceed
     result = generate_seating_plan(slot_id)
     return JsonResponse(result)
@@ -156,17 +307,35 @@ def exam_rooms_alloc(request):
     overlapping_room_ids = []
     rooms = Room.objects.filter(is_active=True).exclude(id__in=overlapping_room_ids)
     allocated_room_ids = []
+    allocated_room_count = 0
+    allocated_room_capacity = 0
     if slot_id:
         try:
             slot = ExamSlot.objects.get(id=slot_id)
-            exams = Exam.objects.filter(exam_slot=slot)
-            for exam in exams:
-                course = exam.course
-                regulation = exam.regulation
-                academic_year = slot.examination.academic_year if slot.examination else ''
-                semester = slot.examination.semester if slot.examination else ''
-                students = StudentCourse.objects.filter(course=course, academic_year=academic_year, semester=semester, student__batch__batch_code=regulation)
-                student_count += students.count()
+
+            # --- Use the same estimator context as the popup (ajax.py) ---
+            from operations.models import StudentExamMap
+            from masters.models import Student
+            from .allocations import estimate_rooms_optimized
+            # Get all students for this slot (across all exams) as StudentExamMap objects
+            student_exam_maps = list(StudentExamMap.objects.filter(exam__exam_slot=slot).select_related('exam__course'))
+            student_count = len(student_exam_maps)
+            # Use all active rooms
+            available_rooms_list = list(Room.objects.filter(is_active=True))
+            # Run estimator (using full room capacity, as in popup)
+            estimated_rooms = estimate_rooms_optimized(student_exam_maps, available_rooms_list)
+            required_room_count = len(estimated_rooms)
+            required_capacity = sum([room.capacity for room in estimated_rooms])
+            allocated_room_ids = [room.id for room in estimated_rooms]
+            allocated_room_count = len(estimated_rooms)
+            allocated_room_capacity = required_capacity
+
+            # --- Optimized Estimator Integration ---
+            from .allocations import estimate_rooms_optimized
+            available_rooms_list = list(Room.objects.filter(is_active=True))
+            optimized_rooms = estimate_rooms_optimized(student_exam_maps, available_rooms_list)
+            optimized_room_count = len(optimized_rooms)
+            optimized_capacity = sum([room.capacity for room in optimized_rooms])
             if request.method == "POST":
                 from .models import RoomAllocation
                 selected_room_ids = set(map(int, request.POST.getlist('selected_rooms')))
@@ -194,8 +363,8 @@ def exam_rooms_alloc(request):
                     request.session['room_alloc_warning'] = f"Deleted rooms: {', '.join(deleted_rooms)}"
                 exam_obj = None
                 exam_slot_obj = None
-                if exams.exists():
-                    exam_obj = exams.first()
+                if exams and hasattr(exams, '__iter__') and len(exams) > 0:
+                    exam_obj = exams[0]
                     exam_slot_obj = exam_obj.exam_slot
                 params = {}
                 if exam_obj and exam_slot_obj:
@@ -208,27 +377,46 @@ def exam_rooms_alloc(request):
                 if params:
                     url += '?' + urlencode(params)
                 return redirect(url)
-            # On GET, auto-select rooms using estimate_rooms_required
-            if request.method == "GET" and exams.exists():
+            if request.method == "GET" and exams and hasattr(exams, '__iter__') and len(exams) > 0:
                 from .models import RoomAllocation
                 allocated_room_ids = list(RoomAllocation.objects.filter(exam_slot=slot).values_list('room_id', flat=True))
-                # If no rooms allocated, use estimate_rooms_required to auto-select
+                # Auto-select rooms if none are allocated, using safe seating estimator
                 if not allocated_room_ids:
-                    from operations.allocations import estimate_rooms_required
-                    estimate = estimate_rooms_required(slot_id)
-                    room_codes = [r['room'] for r in estimate.get('room_distribution', [])]
-                    room_objs = Room.objects.filter(room_code__in=room_codes)
-                    allocated_room_ids = list(room_objs.values_list('id', flat=True))
+                    from .allocations import estimate_rooms_optimized, get_safe_capacity
+                    from operations.models import StudentExamMap
+                    # Use the student exam maps for the estimator
+                    student_exam_maps_fallback = list(StudentExamMap.objects.filter(exam__in=exams).select_related('exam__course'))
+                    
+                    available_rooms_list = list(Room.objects.filter(is_active=True))
+                    optimized_rooms = estimate_rooms_optimized(student_exam_maps_fallback, available_rooms_list)
+                    # Ensure allocated rooms meet or exceed required_capacity
+                    allocated_room_ids = [room.id for room in optimized_rooms]
+                    allocated_rooms = [room for room in available_rooms_list if room.id in allocated_room_ids]
+                    allocated_capacity = sum([get_safe_capacity(r) for r in allocated_rooms])
+                    required_capacity = math.ceil(len(student_exam_maps_fallback) * 1.1)
+                    if allocated_capacity < required_capacity:
+                        # Add only one extra best-fit room if capacity is not met
+                        extra_rooms = [room for room in available_rooms_list if room.id not in allocated_room_ids]
+                        if extra_rooms:
+                            best_room = max(extra_rooms, key=lambda r: get_safe_capacity(r))
+                            allocated_room_ids.append(best_room.id)
+            # Calculate allocated room count and capacity
+            if allocated_room_ids:
+                from .allocations import get_safe_capacity
+                allocated_rooms = Room.objects.filter(id__in=allocated_room_ids)
+                allocated_room_count = allocated_rooms.count()
+                allocated_room_capacity = sum([get_safe_capacity(r) for r in allocated_rooms])
         except ExamSlot.DoesNotExist:
             slot = None
-    import math
-    required_capacity = math.ceil(student_count * 1.1)
     return render(request, "operations/exam_rooms_alloc.html", {
         'slot': slot,
         'rooms': rooms,
         'allocated_room_ids': allocated_room_ids,
         'student_count': student_count,
-        'required_capacity': required_capacity
+        'required_room_count': required_room_count,
+        'required_capacity': required_capacity,
+        'allocated_room_count': allocated_room_count,
+        'allocated_room_capacity': allocated_room_capacity,
     })
 
 def exam_faculty_alloc(request):
@@ -238,8 +426,6 @@ def exam_faculty_alloc(request):
     total_students = 0
     allocated_faculty = 0
     from operations.models import FacultyAvailability, ExamSlot
-    from django.db.models import Q
-    overlapping_faculty_ids = []
     if not slot_id:
         debug_message = "Slot ID is missing. Please select a slot before assigning faculty."
         from .models import ExamSlot
@@ -334,9 +520,30 @@ def exam_faculty_alloc(request):
                 found_assignment = True
         allocated_faculty = len(faculties)
         # Use estimate_rooms_required to get faculty_required based on selected rooms
-        from operations.allocations import estimate_rooms_required
-        estimate = estimate_rooms_required(slot_id)
-        required_faculty = estimate.get('faculty_required', 0)
+        # Assign required_faculty based on room capacity
+        from operations.models import Room, RoomAllocation
+        allocated_room_ids = list(RoomAllocation.objects.filter(exam_slot=slot).values_list('room_id', flat=True))
+        allocated_rooms = Room.objects.filter(id__in=allocated_room_ids)
+        # Use full room capacity for faculty estimation
+        import sys
+        required_faculty = 0
+        for room in allocated_rooms:
+            cap = room.capacity
+            if cap <= 60:
+                fac = 1
+            elif cap <= 120:
+                fac = 2
+            elif cap <= 180:
+                fac = 3
+            else:
+                fac = 4
+            print(f"[DEBUG] Room {room.room_code} cap={cap} => faculty={fac}", file=sys.stdout, flush=True)
+            required_faculty += fac
+        # Show a warning if not enough faculty are available
+        available_faculty_count = Faculty.objects.filter(status='ACTIVE').exclude(faculty_id__in=overlapping_faculty_ids).count()
+        faculty_shortage_warning = None
+        if available_faculty_count < required_faculty:
+            faculty_shortage_warning = f"Warning: Only {available_faculty_count} faculty available for {required_faculty} rooms. Some rooms may not be assigned faculty."
         if not found_assignment:
             active_faculty = Faculty.objects.filter(status='ACTIVE').exclude(faculty_id__in=overlapping_faculty_ids)
             for faculty_obj in active_faculty:
@@ -359,7 +566,8 @@ def exam_faculty_alloc(request):
         'allocated_faculty': allocated_faculty,
         'success_message': success_message,
         'allocated_faculty_objs': allocated_faculty_objs,
-        'allocated_faculty_ids': allocated_faculty_ids
+        'allocated_faculty_ids': allocated_faculty_ids,
+        'faculty_shortage_warning': faculty_shortage_warning
     })
 from django.http import JsonResponse
 from django.core.paginator import Paginator
@@ -400,7 +608,14 @@ def ajax_examinations(request):
     paginator = Paginator(exams, per_page)
     page_obj = paginator.get_page(page)
     results = []
+    from operations.models import ExamSlot
     for idx, exam in enumerate(page_obj.object_list, start=1 + (page_obj.number-1)*per_page):
+        slots = ExamSlot.objects.filter(examination=exam)
+        all_generated = slots.exists() and all([slot.is_generated for slot in slots])
+        # Revoke published status if any slot is not generated
+        if not all_generated and exam.published:
+            exam.published = False
+            exam.save()
         results.append({
             'number': idx,
             'exam_id': exam.id,
@@ -409,6 +624,7 @@ def ajax_examinations(request):
             'semester': getattr(exam, 'semester', ''),
             'start_date': exam.start_date.strftime('%Y-%m-%d'),
             'end_date': exam.end_date.strftime('%Y-%m-%d'),
+            'published': exam.published,
         })
     return JsonResponse({
         'results': results,

@@ -1,0 +1,253 @@
+{% extends 'core/base_faculty.html' %}
+{% load static %}
+{% block content %}
+<div class="pages-main">
+    <h1 class="pages-main-head">My Room Invigilation Assignments</h1>
+    <div class="exam-cards-wrapper">
+        {% if duties %}
+        {% for duty in duties %}
+        <div class="exam-card">
+            <div class="exam-card-header">
+                <h2 class="exam-name">{{ duty.exam_name }}</h2>
+                <div class="exam-status-indicator">
+                    {% if duty.status == 'completed' %}
+                    <span class="status-dot completed"></span>
+                    <span class="status-label completed">Completed</span>
+                    {% else %}
+                    <span class="status-dot upcoming"></span>
+                    <span class="status-label upcoming">Upcoming</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="exam-card-body">
+                <div class="exam-info-row">
+                    <span class="exam-info-label">Faculty ID :</span>
+                    <span class="exam-info-value">{{ duty.faculty_id }}</span>
+                </div>
+                <div class="exam-info-row">
+                    <span class="exam-info-label">Exam Date :</span>
+                    <span class="exam-info-value">{{ duty.exam_date|date:'d M Y' }}</span>
+                </div>
+                <div class="exam-info-row">
+                    <span class="exam-info-label">Exam Type :</span>
+                    <span class="exam-info-value">{{ duty.exam_type }}</span>
+                </div>
+                <div class="exam-info-row">
+                    <span class="exam-info-label">Room No :</span>
+                    <span class="exam-info-value">{{ duty.room_no }}</span>
+                </div>
+                <div class="exam-info-row">
+                    <span class="exam-info-label">Time :</span>
+                    <span class="exam-info-value">
+                        {{ duty.start_time|time:'h:i A' }} - {{duty.end_time|time:'h:iA'}}</span>
+                </div>
+                <div class="exam-info-row">
+                    <span class="exam-info-label">Slot :</span>
+                    <span class="exam-info-value">{{ duty.exam_slot }}</span>
+                </div>
+                <div class="exam-info-row">
+                    <span class="exam-info-label">Duration :</span>
+                    <span class="exam-info-value">{{ duty.duration }}</span>
+                </div>
+            </div>
+            <div class="exam-card-footer">
+                <a href="{% url 'operations:seatingplan' %}?slot_id={{ duty.exam_slot_id }}&room_id={{ duty.room_id }}"
+                    class="btn btn-primary flex-1-text-center">Seating Plan</a>
+
+                {% if duty.can_click %}
+                <a href="javascript:void(0)" class="btn {{ duty.btn_class }} btn-post-attendance flex-1-5-text-center"
+                    data-url="{% url 'operations:mark_attendance' %}?slot_id={{ duty.exam_slot_id }}&room_id={{ duty.room_id }}&partial=1">
+                    {{ duty.attendance_label }}
+                </a>
+                {% else %}
+                <button class="btn {{ duty.btn_class }} flex-1-5-text-center cursor-not-allowed opacity-0-7" disabled>
+                    {{ duty.attendance_label }}
+                </button>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="no-assignment-box">
+            <img src="https://img.icons8.com/isometric/100/null/document.png" class="empty-icon" alt="Empty Icon"><br>
+            No room invigilation assignments found for this faculty.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal Container -->
+<div class="att-modal-overlay" id="attendanceModal">
+    <div class="att-modal-content">
+        <span class="modal-close" onclick="closeAttendanceModal()">&times;</span>
+        <div id="modalBody">
+            <div class="modal-loading-text">
+                <div class="spinner"></div><br>
+                Loading attendance sheet...
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Summary Modal Container -->
+<div class="att-modal-overlay centered" id="summaryModal">
+    <div class="att-modal-content summary-modal-content">
+        <div class="success-icon-wrapper success-icon-wrapper-custom">
+            <svg class="success-checkmark success-checkmark-svg" xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 52 52">
+                <circle class="success-checkmark-circle" cx="26" cy="26" r="25" fill="none" />
+                <path class="success-checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8" />
+            </svg>
+        </div>
+
+        <h2 class="summary-title">Attendance Posted!</h2>
+        <div id="summaryMeta" class="summary-meta">
+            <p id="summaryMessage" class="summary-msg"></p>
+            <p class="summary-subtext">
+                Room: <span id="summaryRoom" class="summary-highlight"></span> |
+                Time: <span id="summaryTime" class="summary-highlight"></span>
+            </p>
+        </div>
+
+        <div class="summary-cards-flex">
+            <!-- Present Card -->
+            <div class="summary-card-present">
+                <div class="summary-card-icon-present">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path
+                            d="M12 12C14.2091 12 16 10.2091 16 8C16 5.79086 14.2091 4 12 4C9.79086 4 8 5.79086 8 8C8 10.2091 9.79086 12 12 12Z"
+                            stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M12 15C8.13401 15 5 18.134 5 22H19C19 18.134 15.866 15 12 15Z" stroke="#16a34a"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M18 10L19.5 11.5L22 9" stroke="#16a34a" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                    </svg>
+                </div>
+                <span class="summary-card-label-present">Present</span>
+                <span id="countPresent" class="summary-card-count-present">0</span>
+            </div>
+
+            <!-- Absent Card -->
+            <div class="summary-card-absent">
+                <div class="summary-card-icon-absent">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path
+                            d="M12 12C14.2091 12 16 10.2091 16 8C16 5.79086 14.2091 4 12 4C9.79086 4 8 5.79086 8 8C8 10.2091 9.79086 12 12 12Z"
+                            stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M12 15C8.13401 15 5 18.134 5 22H19C19 18.134 15.866 15 12 15Z" stroke="#dc2626"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M18 8L22 12M22 8L18 12" stroke="#dc2626" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                    </svg>
+                </div>
+                <span class="summary-card-label-absent">Absent</span>
+                <span id="countAbsent" class="summary-card-count-absent">0</span>
+            </div>
+        </div>
+
+        <button class="btn btn-primary summary-done-btn" onclick="location.reload()">
+            Done & Return
+        </button>
+    </div>
+</div>
+
+<script>
+    function openAttendanceModal(url) {
+        const modal = document.getElementById('attendanceModal');
+        const modalBody = document.getElementById('modalBody');
+        modal.style.display = 'grid'; // Changed to grid for middle-top positioning
+        document.body.classList.add('modal-open');
+
+        // Reset body
+        modalBody.innerHTML = '<div style="text-align:center; padding: 40px; color:#64748b;">Loading attendance sheet...</div>';
+
+        fetch(url)
+            .then(response => response.text())
+            .then(html => {
+                modalBody.innerHTML = html;
+            })
+            .catch(err => {
+                modalBody.innerHTML = '<div style="color:red; text-align:center; padding: 40px;">Error loading attendance sheet. Please try again.</div>';
+                console.error(err);
+            });
+    }
+
+    function closeAttendanceModal() {
+        const modal = document.getElementById('attendanceModal');
+        modal.style.display = 'none';
+        document.body.classList.remove('modal-open');
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const buttons = document.querySelectorAll('.btn-post-attendance');
+        buttons.forEach(btn => {
+            btn.addEventListener('click', function (e) {
+                e.preventDefault();
+                const url = this.getAttribute('data-url');
+                openAttendanceModal(url);
+            });
+        });
+
+        // Close on overlay click
+        const overlay = document.getElementById('attendanceModal');
+        overlay.addEventListener('click', function (e) {
+            if (e.target === this) {
+                closeAttendanceModal();
+            }
+        });
+
+        // Delegate form submission for dynamically loaded content
+        document.body.addEventListener('submit', function (e) {
+            if (e.target && e.target.closest('#modalBody form')) {
+                e.preventDefault();
+                const form = e.target;
+                const formData = new FormData(form);
+                const url = form.action + '&partial=1';
+
+                // Show loading state on button
+                const submitBtn = form.querySelector('button[type="submit"]');
+                const originalBtnText = submitBtn.innerHTML;
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<div class="spinner-small"></div> Processing...';
+
+                fetch(url, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            closeAttendanceModal();
+                            showSummaryModal(data);
+                        } else {
+                            alert("Error: " + (data.error || "Unknown error occurred"));
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = originalBtnText;
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        alert("Submission failed. Please check your connection.");
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalBtnText;
+                    });
+            }
+        });
+    });
+
+    function showSummaryModal(data) {
+        const modal = document.getElementById('summaryModal');
+        document.getElementById('summaryMessage').innerText = data.message;
+        document.getElementById('summaryRoom').innerText = data.room_code;
+        document.getElementById('summaryTime').innerText = data.exam_time;
+        document.getElementById('countPresent').innerText = data.present;
+        document.getElementById('countAbsent').innerText = data.absent;
+
+        modal.style.display = 'grid';
+        document.body.classList.add('modal-open');
+    }
+</script>
+{% endblock %}

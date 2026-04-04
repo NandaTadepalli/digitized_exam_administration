@@ -1,0 +1,64 @@
+{% load seating_extras %}
+
+<div class="att-table-header-box">
+    <div class="att-header-stats">
+        <div class="att-header-info-group">
+            <span><strong>Date:</strong> {{ slot.exam_date|date:"d M Y" }}</span>
+            <span><strong>Time:</strong> {{ slot.start_time|time:"h:i A" }} - {{ slot.end_time|time:"h:i A" }}</span>
+            <span><strong>Slot:</strong> {{ slot.slot_code }}</span>
+            <span><strong>Room:</strong> {{ room.room_code }}</span>
+        </div>
+        {% if read_only %}
+        <span class="badge-read-only">
+            Read Only
+        </span>
+        {% endif %}
+    </div>
+</div>
+
+<form method="POST" action="{% url 'operations:mark_attendance' %}?slot_id={{ slot.id }}&room_id={{ room.id }}">
+    {% csrf_token %}
+    <div class="att-table-scroll">
+        <table class="att-table-base">
+            <thead>
+                <tr>
+                    <th class="w-50">S.No</th>
+                    <th class="w-140">Student ID</th>
+                    <th>Student Name</th>
+                    <th class="w-130">Course</th>
+                    <th class="w-80 text-center">Absent</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in students %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td><strong class="text-navy">{{ p.student_exam.student.student_id }}</strong></td>
+                    <td>{{ p.student_exam.student.std_name }}</td>
+                    <td>{{ p.student_exam.exam.course.course_code }}</td>
+                    <td class="text-center">
+                        <input type="checkbox" name="absent_{{ p.student_exam.id }}"
+                            class="att-check-input-style {% if read_only %}cursor-not-allowed{% else %}cursor-pointer{% endif %}" {% if
+                            attendance_data|get_item:p.student_exam.id == 'ABSENT' %}checked{% endif %} {% if read_only
+                            %}disabled{% endif %}>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="no-data-cell">
+                        No students assigned to you in this room.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if students and not read_only %}
+    <div class="att-submit-box">
+        <button type="submit" class="btn-submit-att-style">
+            Submit Attendance
+        </button>
+    </div>
+    {% endif %}
+</form>

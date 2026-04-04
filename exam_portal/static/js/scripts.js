@@ -1,3 +1,164 @@
+// ========== Utility: Format Date as DD-MMM-YYYY ========== 
+function formatDateDMY(dateStr) {
+    if (!dateStr) return '';
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const d = new Date(dateStr);
+    if (isNaN(d)) return dateStr;
+    return `${d.getDate().toString().padStart(2, '0')}-${months[d.getMonth()]}-${d.getFullYear()}`;
+}
+// ========== Delete Exam Modal Logic ========== 
+document.addEventListener('DOMContentLoaded', function() {
+    var deleteExamModal = document.getElementById('deleteExamModal');
+    if (deleteExamModal) {
+        deleteExamModal.style.display = 'none';
+    }
+});
+document.addEventListener('click', function(e) {
+    var deleteExamModal = document.getElementById('deleteExamModal');
+    if (!deleteExamModal) return;
+    // Only show modal if delete button is clicked
+    if (e.target && e.target.id === 'confirmDeleteExamLink') {
+        deleteExamModal.style.display = 'flex';
+    } else if (deleteExamModal.style.display === 'flex' && (!e.target || (e.target.id !== 'confirmDeleteExamLink' && e.target.id !== 'closeDeleteExamModal' && e.target.id !== 'cancelDeleteExamBtn'))) {
+        // Hide modal if visible and not triggered by delete/cancel/close
+        deleteExamModal.style.display = 'none';
+    }
+    if (e.target && (e.target.id === 'closeDeleteExamModal' || e.target.id === 'cancelDeleteExamBtn')) {
+        deleteExamModal.style.display = 'none';
+    }
+});
+document.addEventListener('click', function(e) {
+    var deleteExamModal = document.getElementById('deleteExamModal');
+    if (!deleteExamModal) return;
+    if (e.target && e.target.id === 'confirmDeleteExamLink') {
+        deleteExamModal.style.display = 'flex';
+    }
+    if (e.target && (e.target.id === 'closeDeleteExamModal' || e.target.id === 'cancelDeleteExamBtn')) {
+        deleteExamModal.style.display = 'none';
+    }
+});
+// ========== Exam Publishable Check (examination.html) ========== 
+function checkExamPublishable() {
+    fetch('/ops/ajax/check_exam_publishable/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || ''
+        },
+        body: JSON.stringify({ exam_id: window.examIdForSlots || '' })
+    })
+    .then(resp => resp.json())
+    .then(data => {
+        var publishExamWrapper = document.getElementById('publishExamWrapper');
+        if (publishExamWrapper) {
+            if (data.all_completed && !data.published) {
+                publishExamWrapper.style.display = 'block';
+            } else {
+                publishExamWrapper.style.display = 'none';
+            }
+        }
+        // Update exam status column
+        const table = document.getElementById('examination-table');
+        if (table) {
+            const tbody = table.querySelector('tbody');
+            if (tbody) {
+                Array.from(tbody.children).forEach(row => {
+                    const statusCell = row.children[7];
+                    if (data.published) {
+                        statusCell.innerHTML = '<span class="exam-status exam-status-published">Published</span>';
+                    } else if (data.all_completed) {
+                        statusCell.innerHTML = '<span class="exam-status exam-status-completed">Ready to Publish</span>';
+                    } else {
+                        statusCell.innerHTML = '<span class="exam-status exam-status-pending">Pending</span>';
+                    }
+                });
+            }
+        }
+    });
+}
+document.addEventListener('DOMContentLoaded', function() {
+    checkExamPublishable();
+});
+document.addEventListener('click', function(e) {
+    if (e.target && e.target.id === 'publishExamBtn') {
+        e.preventDefault();
+        fetch('/ops/ajax/publish_exam/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || ''
+            },
+            body: JSON.stringify({ exam_id: window.examIdForSlots || '' })
+        })
+        .then(resp => resp.json())
+        .then(data => {
+            if (data.success) {
+                showPopupMessage('Exam published successfully.', 'success');
+                checkExamPublishable();
+            } else {
+                showPopupMessage(data.error || 'Failed to publish exam.', 'error');
+            }
+        })
+        .catch(() => {
+            showPopupMessage('Network error. Please try again.', 'error');
+        });
+    }
+});
+// Global popup message utility
+function showPopupMessage(text, type) {
+    let popup = document.getElementById('popup-messages');
+    if (!popup) {
+        popup = document.createElement('div');
+        popup.id = 'popup-messages';
+        popup.style.position = 'fixed';
+        popup.style.top = '20px';
+        popup.style.right = '30px';
+        popup.style.zIndex = '9999';
+        document.body.appendChild(popup);
+    }
+    let msgDiv = document.createElement('div');
+    msgDiv.className = 'popup-message popup-' + (type || 'error');
+    msgDiv.tabIndex = 0;
+    msgDiv.innerHTML = text;
+    popup.appendChild(msgDiv);
+    // Dismiss only when clicking outside
+    function dismissPopup(e) {
+        if (!popup.contains(e.target)) {
+            popup.remove();
+            document.removeEventListener('mousedown', dismissPopup);
+        }
+    }
+    document.addEventListener('mousedown', dismissPopup);
+}
+// Robust publish badge click handler for dynamically rendered elements
+document.addEventListener('click', function(e) {
+    const publishBtn = e.target.closest('.publish-exam-btn');
+    if (publishBtn) {
+        e.preventDefault();
+        const examId = publishBtn.dataset.examId;
+        fetch('/ops/ajax/publish_exam/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || ''
+            },
+            body: JSON.stringify({ exam_id: examId })
+        })
+        .then(resp => resp.json())
+        .then(data => {
+            if (data.success) {
+                showPopupMessage('Exam published successfully.', 'success');
+                fetchExaminations(); // Refresh table
+            } else {
+                showPopupMessage(data.error || 'Failed to publish exam.', 'error');
+            }
+        })
+        .catch(() => {
+            showPopupMessage('Network error. Please try again.', 'error');
+        });
+        return;
+    }
+});
 // ========== Seating Plan Coloring ========== 
 document.addEventListener('DOMContentLoaded', function () {
     var seatingTable = document.querySelector('.seating-table');
@@ -89,8 +250,8 @@ document.addEventListener('DOMContentLoaded', function () {
         //         }
         //     });
         // }
-    var requiredCap = document.getElementById('required-capacity-display');
-    var allocatedCap = document.getElementById('allocated-capacity-display');
+    var requiredRoom = document.getElementById('required-room-display');
+    var allocatedRoom = document.getElementById('allocated-room-display');
     var roomCheckboxes = document.querySelectorAll('input[name="selected_rooms"]');
     var errorMsg = null;
     var clearBtn = document.getElementById('clear-room-selection');
@@ -106,94 +267,139 @@ document.addEventListener('DOMContentLoaded', function () {
     } else {
         errorMsg = document.getElementById('room-capacity-error');
     }
-    if (requiredCap && allocatedCap && roomCheckboxes.length > 0) {
-                if (clearBtn && roomCheckboxes.length > 0) {
-                    clearBtn.addEventListener('click', function() {
-                        roomCheckboxes.forEach(function(cb) {
-                            cb.checked = false;
-                            cb.disabled = false;
-                        });
-                        if (errorMsg) errorMsg.style.display = 'none';
-                        updateAllocatedCapacity();
-                    });
+    if (requiredRoom && allocatedRoom && roomCheckboxes.length > 0) {
+        if (clearBtn && roomCheckboxes.length > 0) {
+            clearBtn.addEventListener('click', function() {
+                roomCheckboxes.forEach(function(cb) {
+                    cb.checked = false;
+                    cb.disabled = false;
+                });
+                if (errorMsg) errorMsg.style.display = 'none';
+                updateAllocatedRoom();
+            });
+        }
+        // Enforce allocation rule on form submit
+        var allocationForm = document.querySelector('.rooms-table-section form');
+        if (allocationForm) {
+            allocationForm.addEventListener('submit', function(e) {
+                // Parse required and allocated from display (format: count | capacity)
+                let requiredText = requiredRoom.textContent.split('|');
+                let allocatedText = allocatedRoom.textContent.split('|');
+                let requiredCap = 0;
+                let allocatedCap = 0;
+                if (requiredText.length > 1) {
+                    requiredCap = parseInt(requiredText[1].trim()) || 0;
                 }
-        function updateAllocatedCapacity() {
-            let total = 0;
-            roomCheckboxes.forEach(function(cb) {
-                if (cb.checked) {
-                    total += parseInt(cb.getAttribute('data-capacity')) || 0;
+                if (allocatedText.length > 1) {
+                    allocatedCap = parseInt(allocatedText[1].trim()) || 0;
+                }
+                if (requiredCap > 0) {
+                    if (allocatedCap < requiredCap) {
+                        e.preventDefault();
+                        showPopupMessage('Cannot allocate: Allocated capacity is less than required. Please select more rooms to meet the required capacity.', 'error');
+                    }
+                } else if (allocatedCap === 0) {
+                    // Allow submission, but show a popup message and redirect to slot list
+                    e.preventDefault();
+                    showPopupMessage('No rooms were allocated for this slot.', 'error');
+                    setTimeout(function() {
+                        // Change the URL below to your exam slot list or dashboard as appropriate
+                        window.location.href = '/ops/exam_slots/';
+                    }, 2500);
                 }
             });
-            allocatedCap.textContent = total;
-            // Hide error if under required
-            if (errorMsg) errorMsg.style.display = 'none';
         }
-        updateAllocatedCapacity();
-        roomCheckboxes.forEach(function(cb) {
-            cb.addEventListener('change', function(e) {
-                let total = 0;
+    }
+// Move updateAllocatedRoom and listeners outside the if block
+function updateAllocatedRoom() {
+    if (!allocatedRoom) return;
+    let total = 0;
+    let count = 0;
+    if (typeof roomCheckboxes === 'undefined') return;
+    roomCheckboxes.forEach(function(cb) {
+        if (cb.checked) {
+            total += parseInt(cb.getAttribute('data-capacity')) || 0;
+            count += 1;
+        }
+    });
+    allocatedRoom.textContent = count + ' | ' + total;
+    // Hide error if under required
+    if (typeof errorMsg !== 'undefined' && errorMsg) errorMsg.style.display = 'none';
+}
+if (typeof roomCheckboxes !== 'undefined' && typeof allocatedRoom !== 'undefined') {
+    updateAllocatedRoom();
+    roomCheckboxes.forEach(function(cb) {
+        cb.addEventListener('change', function(e) {
+            let total = 0;
+            let count = 0;
+            roomCheckboxes.forEach(function(box) {
+                if (box.checked) {
+                    total += parseInt(box.getAttribute('data-capacity')) || 0;
+                    count += 1;
+                }
+            });
+            // Parse required from requiredRoom (format: count | capacity)
+            let requiredText = requiredRoom.textContent.split('|');
+            let required = 0;
+            if (requiredText.length > 1) {
+                required = parseInt(requiredText[1].trim()) || 0;
+            }
+            // Find minimum capacity among unchecked rooms
+            let minCap = Infinity;
+            roomCheckboxes.forEach(function(box) {
+                if (!box.checked) {
+                    let cap = parseInt(box.getAttribute('data-capacity')) || 0;
+                    if (cap < minCap) minCap = cap;
+                }
+            });
+            if (total >= required) {
+                // Allow this selection, but disable further selection
+                if (typeof errorMsg !== 'undefined' && errorMsg) {
+                    errorMsg.textContent = 'Required capacity attained or exceeded. Cannot select more rooms.';
+                    errorMsg.style.display = 'block';
+                }
                 roomCheckboxes.forEach(function(box) {
-                    if (box.checked) {
-                        total += parseInt(box.getAttribute('data-capacity')) || 0;
-                    }
+                    if (!box.checked) box.disabled = true;
                 });
-                let required = parseInt(requiredCap.textContent) || 0;
-                // Find minimum capacity among unchecked rooms
-                let minCap = Infinity;
+            } else {
+                // Border condition: only allow min cap room if next selection would meet/exceed required and difference is less than 40
+                let remaining = required - total;
+                let minCapRooms = [];
                 roomCheckboxes.forEach(function(box) {
                     if (!box.checked) {
                         let cap = parseInt(box.getAttribute('data-capacity')) || 0;
-                        if (cap < minCap) minCap = cap;
+                        if (cap === minCap) minCapRooms.push(box);
                     }
                 });
-                if (total >= required) {
-                    // Allow this selection, but disable further selection
-                    if (errorMsg) {
-                        errorMsg.textContent = 'Required capacity attained or exceeded. Cannot select more rooms.';
-                        errorMsg.style.display = 'block';
-                    }
-                    roomCheckboxes.forEach(function(box) {
-                        if (!box.checked) box.disabled = true;
-                    });
-                } else {
-                    // Border condition: only allow min cap room if next selection would meet/exceed required and difference is less than 40
-                    let remaining = required - total;
-                    let minCapRooms = [];
+                let restrictToMin = false;
+                if (remaining < 40) {
                     roomCheckboxes.forEach(function(box) {
                         if (!box.checked) {
                             let cap = parseInt(box.getAttribute('data-capacity')) || 0;
-                            if (cap === minCap) minCapRooms.push(box);
+                            if (cap >= remaining) restrictToMin = true;
                         }
                     });
-                    let restrictToMin = false;
-                    if (remaining < 40) {
-                        roomCheckboxes.forEach(function(box) {
-                            if (!box.checked) {
-                                let cap = parseInt(box.getAttribute('data-capacity')) || 0;
-                                if (cap >= remaining) restrictToMin = true;
-                            }
-                        });
-                    }
-                    roomCheckboxes.forEach(function(box) {
-                        if (!box.checked) {
-                            let cap = parseInt(box.getAttribute('data-capacity')) || 0;
-                            if (restrictToMin) {
-                                if (cap === minCap) {
-                                    box.disabled = false;
-                                } else {
-                                    box.disabled = true;
-                                }
-                            } else {
-                                box.disabled = false;
-                            }
-                        }
-                    });
-                    if (errorMsg) errorMsg.style.display = 'none';
                 }
-                updateAllocatedCapacity();
-            });
+                roomCheckboxes.forEach(function(box) {
+                    if (!box.checked) {
+                        let cap = parseInt(box.getAttribute('data-capacity')) || 0;
+                        if (restrictToMin) {
+                            if (cap === minCap) {
+                                box.disabled = false;
+                            } else {
+                                box.disabled = true;
+                            }
+                        } else {
+                            box.disabled = false;
+                        }
+                    }
+                });
+                if (typeof errorMsg !== 'undefined' && errorMsg) errorMsg.style.display = 'none';
+            }
+            updateAllocatedRoom();
         });
-    }
+    });
+}
 });
 // ========== Faculty Allocation: Dynamic Allocated Faculty ========== 
 document.addEventListener('DOMContentLoaded', function () {
@@ -686,8 +892,140 @@ if (deleteExamForm) {
 }
 // ============ EXAM SLOT TABLE AJAX (operations/exams.html) ============
 function fetchExamSlotsAjax() {
+        // Room Assignment badge AJAX modal logic
+        document.addEventListener('click', function(e) {
+            const roomBadge = e.target.closest('.room-assignment-badge');
+            if (roomBadge) {
+                e.preventDefault();
+                const slotId = roomBadge.getAttribute('data-slot-id');
+                // Modal elements (reuse or create if not present)
+                let modal = document.getElementById('roomAllocModal');
+                let modalContent = document.getElementById('roomAllocModalContent');
+                if (!modal) {
+                    modal = document.createElement('div');
+                    modal.id = 'roomAllocModal';
+                    modal.className = 'modal';
+                    modal.style.display = 'none';
+                    modal.innerHTML = `<div class="modal-content">
+                        <span id="closeRoomAllocModal">&times;</span>
+                        <div id="roomAllocModalContent"><h2>Allocated Rooms</h2><div>Loading...</div></div>
+                    </div>`;
+                    document.body.appendChild(modal);
+                    modalContent = document.getElementById('roomAllocModalContent');
+                }
+                modal.style.display = 'flex';
+                modalContent.innerHTML = '<h2>Allocated Rooms</h2><div>Loading...</div>';
+                fetch(`/ops/ajax/slot-rooms/?slot_id=${slotId}`)
+                    .then(resp => resp.json())
+                    .then(data => {
+                        if (!data.success) {
+                            modalContent.innerHTML = `<div class='popup-message popup-error'>${data.error || 'No allocated rooms found.'}</div>`;
+                            return;
+                        }
+                        let html = '';
+                        // Slot info
+                        html += `<div class='mb-1em popup-slot-info'>`;
+                        html += `<span class='popup-slot-label'>Exam Type:</span> <span class='popup-slot-value'>${data.slot.exam_type || ''}</span>`;
+                        html += `<span class='popup-slot-label'>Mode:</span> <span class='popup-slot-value'>${data.slot.mode || ''}</span>`;
+                        html += `<span class='popup-slot-label'>Date:</span> <span class='popup-slot-value'>${data.slot.exam_date}</span>`;
+                        html += `<span class='popup-slot-label'>Time:</span> <span class='popup-slot-value'>${data.slot.start_time}-${data.slot.end_time}</span>`;
+                        html += `<span class='popup-slot-label'>Slot Code:</span> <span class='popup-slot-value'>${data.slot.slot_code || ''}</span>`;
+                        html += `</div>`;
+                        // Show required and allocated summary
+                        html += `<div class='room-capacity-summary-wrapper' style='margin-bottom:1em;'>`;
+                        html += `<span class='room-capacity-summary-item room-capacity-summary-flex'><span class='room-capacity-summary-label'>Required Rooms | Capacity:</span> <span class='room-capacity-summary-value required'>${data.required_room_count} | ${data.required_capacity}</span></span>`;
+                        html += `<span class='room-capacity-summary-item room-capacity-summary-flex'><span class='room-capacity-summary-label'>Allocated Rooms | Capacity:</span> <span class='room-capacity-summary-value selected'>${data.allocated_room_count} | ${data.allocated_capacity}</span></span>`;
+                        html += `</div>`;
+                        // Edit buttons
+                        html += `<div class="popup-edit-btn-container">`;
+                        html += `<a href=\"/ops/exam_rooms_alloc/?slot_id=${slotId}\" class="popup-edit-btn badge" style="background:#2563eb;color:#fff;text-decoration:none;">Edit Rooms</a>`;
+                        html += `</div>`;
+                        // Rooms table
+                        if (!data.rooms || data.rooms.length === 0) {
+                            html += `<div>No rooms allocated for this slot.</div>`;
+                        } else {
+                            html += `<div class='dashboard-popup-table-wrapper'><table class='dashboard-popup-table'>`;
+                            html += `<thead><tr><th>Room No</th><th>Type</th><th>Capacity</th><th>Block</th></tr></thead><tbody>`;
+                            data.rooms.forEach(function (room) {
+                                html += `<tr>`;
+                                html += `<td>${room.room_no ? room.room_no : 'N/A'}</td>`;
+                                html += `<td>${room.room_type ? room.room_type : 'N/A'}</td>`;
+                                html += `<td>${room.capacity !== undefined && room.capacity !== null && room.capacity !== '' ? room.capacity : 'N/A'}</td>`;
+                                html += `<td>${room.block ? room.block : 'N/A'}</td>`;
+                                html += `</tr>`;
+                            });
+                            html += `</tbody></table></div>`;
+                        }
+                        modalContent.innerHTML = html;
+                    })
+                    .catch(() => {
+                        modalContent.innerHTML = `<div class='popup-message popup-error'>Failed to load room details (network error).</div>`;
+                    });
+                // Close logic
+                document.getElementById('closeRoomAllocModal').onclick = function () {
+                    modal.style.display = 'none';
+                };
+                modal.onclick = function (evt) {
+                    if (evt.target === modal) modal.style.display = 'none';
+                };
+            }
+        });
     // Slot courses badge click handler (delegated)
     document.addEventListener('click', function (e) {
+        // Always handle publish badge first
+        const publishBtnMain = e.target.closest('.publish-exam-btn');
+        if (publishBtnMain) {
+            e.preventDefault();
+            const examId = publishBtnMain.dataset.examId;
+            fetch('/ops/ajax/publish_exam/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || ''
+                },
+                body: JSON.stringify({ exam_id: examId })
+            })
+            .then(resp => resp.json())
+            .then(data => {
+                if (data.success) {
+                    showPopupMessage('Exam published successfully.', 'success');
+                    fetchExaminations(); // Force table refresh
+                } else {
+                    showPopupMessage(data.error || 'Failed to publish exam.', 'error');
+                }
+            })
+            .catch(() => {
+                showPopupMessage('Network error. Please try again.', 'error');
+            });
+            return;
+        }
+                                // Publish exam button click handler
+                                const publishBtn = e.target.closest('.publish-exam-btn');
+                                if (publishBtn) {
+                                    e.preventDefault();
+                                    const examId = publishBtn.dataset.examId;
+                                    fetch('/ops/ajax/publish_exam/', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'X-CSRFToken': (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || ''
+                                        },
+                                        body: JSON.stringify({ exam_id: examId })
+                                    })
+                                    .then(resp => resp.json())
+                                    .then(data => {
+                                        if (data.success) {
+                                            showPopupMessage('Exam published successfully.', 'success');
+                                            fetchExaminations(); // Force table refresh
+                                        } else {
+                                            showPopupMessage(data.error || 'Failed to publish exam.', 'error');
+                                        }
+                                    })
+                                    .catch(() => {
+                                        showPopupMessage('Network error. Please try again.', 'error');
+                                    });
+                                    return;
+                                }
         // Ensure preventDefault is called before navigation
         if (e.defaultPrevented) return;
         const badge = e.target.closest('.slot-courses-badge');
@@ -792,8 +1130,8 @@ function fetchExamSlotsAjax() {
                                 html += `<span class='popup-slot-label'>Slot Code:</span> <span class='popup-slot-value'>${data.slot.slot_code || 'N/A'}</span>`;
                                 html += `</div>`;
                                 // Edit buttons
-                                html += `<div class=\"popup-edit-btn-container\">`;
-                                html += `<a href=\"/ops/exam_faculty_alloc/?slot_id=${finalSlotId}\" class=\"popup-edit-btn badge\" style=\"background:#2563eb;color:#fff;text-decoration:none;\">Edit Faculty</a>`;
+                                html += `<div class="popup-edit-btn-container">`;
+                                html += `<a href=\"/ops/exam_faculty_alloc/?slot_id=${finalSlotId}\" class="popup-edit-btn badge" style="background:#2563eb;color:#fff;text-decoration:none;">Edit Faculty</a>`;
                                 html += `</div>`;
                                 // Faculty table
                                 if (!data.faculty || data.faculty.length === 0) {
@@ -873,9 +1211,14 @@ function fetchExamSlotsAjax() {
                         html += `<span class='popup-slot-label'>Time:</span> <span class='popup-slot-value'>${data.slot.start_time}-${data.slot.end_time}</span>`;
                         html += `<span class='popup-slot-label'>Slot Code:</span> <span class='popup-slot-value'>${data.slot.slot_code || ''}</span>`;
                         html += `</div>`;
+                        // Show required and allocated summary
+                        html += `<div class='room-capacity-summary-wrapper' style='margin-bottom:1em;'>`;
+                        html += `<span class='room-capacity-summary-item room-capacity-summary-flex'><span class='room-capacity-summary-label'>Required Rooms | Capacity:</span> <span class='room-capacity-summary-value required'>${data.required_room_count} | ${data.required_capacity}</span></span>`;
+                        html += `<span class='room-capacity-summary-item room-capacity-summary-flex'><span class='room-capacity-summary-label'>Allocated Rooms | Capacity:</span> <span class='room-capacity-summary-value selected'>${data.allocated_room_count} | ${data.allocated_capacity}</span></span>`;
+                        html += `</div>`;
                         // Edit buttons
-                        html += `<div class=\"popup-edit-btn-container\">`;
-                        html += `<a href=\"/ops/exam_rooms_alloc/?slot_id=${finalSlotId}\" class=\"popup-edit-btn badge\" style=\"background:#2563eb;color:#fff;text-decoration:none;\">Edit Rooms</a>`;
+                        html += `<div class="popup-edit-btn-container">`;
+                        html += `<a href=\"/ops/exam_rooms_alloc/?slot_id=${finalSlotId}\" class="popup-edit-btn badge" style="background:#2563eb;color:#fff;text-decoration:none;">Edit Rooms</a>`;
                         html += `</div>`;
                         // Rooms table
                         if (!data.rooms || data.rooms.length === 0) {
@@ -1356,7 +1699,6 @@ document.addEventListener('DOMContentLoaded', function () {
         // Always clear and hide deleteExamModal before reload
         const modal = document.getElementById('deleteExamModal');
         if (modal) {
-            modal
             document.getElementById('deleteExamWarning').innerHTML = '';
             document.getElementById('deleteExamDetails').innerHTML = '';
             document.getElementById('deleteExamId').value = '';
@@ -1381,7 +1723,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             <td data-raw="${exam.start_date}">${formatDateDMY(exam.start_date)}</td>
                             <td data-raw="${exam.end_date}">${formatDateDMY(exam.end_date)}</td>
                             <td id="slot-badge-${exam.exam_id}"><a href="${slotLink}" class="slot-link" data-exam-name="${encodeURIComponent(exam.exam_name)}">${pendingBadge()}</a></td>
-                            <td>${pendingBadge()}</td>
+                            <td id="status-badge-${exam.exam_id}">${pendingBadge()}</td>
                             <td>
                                 <a href="#" class="edit-exam-btn" data-exam-id="${exam.exam_id}" title="Edit"><img src="https://img.icons8.com/?size=100&id=kzmsQM0bM3Bl&format=png&color=000000" alt="Edit Exam" style="width:16px;height:16px;margin-right:6px;"></a>
                                 <a href="#" class="delete-exam-btn" data-exam-id="${exam.exam_id}" data-exam-name="${exam.exam_name}"><img src="https://img.icons8.com/?size=100&id=99971&format=png&color=000000" alt="Delete Exam" style="width:16px;height:16px;"></a>
@@ -1391,26 +1733,24 @@ document.addEventListener('DOMContentLoaded', function () {
                             .then(resp => resp.json())
                             .then(slotData => {
                                 const badgeTd = document.getElementById(`slot-badge-${exam.exam_id}`);
+                                const statusTd = document.getElementById(`status-badge-${exam.exam_id}`);
                                 if (badgeTd && slotData.slots && slotData.slots.length > 0) {
                                     badgeTd.innerHTML = `<a href="${slotLink}" class="slot-link" data-exam-name="${encodeURIComponent(exam.exam_name)}">${availableBadge(slotData.slots.length)}</a>`;
                                 }
-                                const scheduleLink = document.querySelector(`#schedule-badge-${exam.exam_id} .exam-schedule-link`);
-                                if (scheduleLink) {
-                                    scheduleLink.dataset.slotCount = slotData.slots.length;
-                                    if (slotData.slots.length > 0) {
-                                        scheduleLink.dataset.slotId = slotData.slots[0].id;
-                                        scheduleLink.dataset.examLink = `/ops/exams/?exam_id=${exam.exam_id}&exam_name=${encodeURIComponent(exam.exam_name)}&start_date=${encodeURIComponent(exam.start_date)}&end_date=${encodeURIComponent(exam.end_date)}`;
-                                    }
-                                    // Check if all slots have at least one course assigned
-                                    let allAssigned = slotData.slots.length > 0 && slotData.slots.every(s => s.course_count > 0);
-                                    let totalCourses = slotData.slots.reduce((sum, s) => sum + (s.course_count || 0), 0);
-                                    if (allAssigned) {
-                                        scheduleLink.innerHTML = `<span class="exam-status exam-status-available" style="background:#e6f9e6;color:#1a7f1a;padding:2px 10px 2px 10px;border-radius:6px;display:inline-flex;align-items:center;font-weight:600;">course : ${totalCourses}</span>`;
+                                // Determine if all slots are completed (is_generated and assignments done)
+                                let allCompleted = slotData.slots.length > 0 && slotData.slots.every(s => s.status === 'Publish');
+                                let anyPending = slotData.slots.some(s => s.status !== 'Publish');
+                                if (statusTd) {
+                                    if (exam.published && allCompleted) {
+                                        statusTd.innerHTML = `<span class="exam-status exam-status-available" style="background:#e6f9e6;color:#1a7f1a;padding:2px 10px 2px 10px;border-radius:6px;display:inline-flex;align-items:center;font-weight:600;">Published <img src="https://img.icons8.com/?size=100&id=79211&format=png&color=22c55e" alt="Published" class="status-icon" style="width:1.2em;height:1.2em;vertical-align:middle;margin-left:6px;"></span>`;
+                                    } else if (allCompleted && !exam.published) {
+                                        statusTd.innerHTML = `<a href="#" class="publish-exam-btn" data-exam-id="${exam.exam_id}" style="text-decoration:none;"><span class="exam-status exam-status-publish" style="background:#fff3cd;color:#d97706;padding:2px 10px 2px 10px;border-radius:6px;display:inline-flex;align-items:center;font-weight:600;cursor:pointer;">Publish <img src="https://img.icons8.com/?size=100&id=79211&format=png&color=000000" alt="Publish" class="status-icon" style="width:1.2em;height:1.2em;vertical-align:middle;margin-left:6px;"></span></a>`;
                                     } else {
-                                        scheduleLink.innerHTML = pendingBadge();
+                                        statusTd.innerHTML = pendingBadge();
                                     }
                                 }
                             });
+                        // ...existing code...
                     });
                 } else {
                     tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;">No examinations found.</td></tr>';

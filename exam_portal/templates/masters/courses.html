@@ -5,16 +5,18 @@
     <h1 class="pages-main-head">Course Management</h1>
     <div class="note-and-actions">
         <div class="note-text">
-            <p style="color: red;"><strong>Note:</strong> Upload course data in <strong>.csv</strong> format.</p>
-            <p style="color: red;">(Download the sample .csv file and add data in the specified structure to avoid
+            <p class="text-red"><strong>Note:</strong> Upload course data in <strong>.csv</strong> format.</p>
+            <p class="text-red">(Download the sample .csv file and add data in the specified structure to avoid
                 errors)</p>
         </div>
         <div class="add-data">
-            <a class="control-btn" href="#">Add new course</a>
-            <form id="courseUploadForm" action="{% url 'masters:course_upload' %}" method="post" enctype="multipart/form-data" style="display:inline;">
+            <a class="control-btn" href="#">Add new student</a>
+            <form id="courseUploadForm" action="{% url 'masters:course_upload' %}" method="post"
+                enctype="multipart/form-data" class="d-inline">
                 {% csrf_token %}
-                <label for="uploadFile" class="control-btn" style="cursor: pointer;">Upload File</label>
-                <input type="file" id="uploadFile" name="csv_file" style="display: none;" accept=".csv" onchange="this.form.submit();" />
+                <label for="uploadFile" class="control-btn cursor-pointer">Upload File</label>
+                <input type="file" id="uploadFile" name="csv_file" class="d-none" accept=".csv"
+                    onchange="this.form.submit();" />
             </form>
             <a href="{% static 'samples/coursedata.csv' %}" download class="control-btn">Download Sample CSV</a>
         </div>
@@ -24,39 +26,43 @@
     <div class="controls">
         <form method="get" action="" id="courseFilterForm">
             <label for="search">Search Course:</label>
-            <input type="text" id="search" name="search" placeholder="Enter Course name or Code" value="{{ search|default:'' }}" />
-            <button type="submit" style="display:none"></button>
+            <input type="text" id="search" name="search" placeholder="Enter Course name or Code"
+                value="{{ search|default:'' }}" />
+            <button type="submit" class="d-none"></button>
         </form>
     </div>
 
 
-    <div class="actions" style="display: flex; align-items: center; gap: 16px;">
-        <div class="pagination-bar" style="flex:1;">
+    <div class="actions actions-flex-gap-16">
+        <div class="pagination-bar flex-1">
             {% if page_obj %}
-            <div class="pagination" style="display: flex; align-items: center; gap: 4px;">
+            <div class="pagination pagination-flex-gap-4">
                 {% if page_obj.has_previous %}
-                    <a href="?{% if search %}search={{ search }}&{% endif %}page=1" class="page-arrow" style="padding: 2px 8px; font-size: 18px;">&#171;</a>
-                    <a href="?{% if search %}search={{ search }}&{% endif %}page={{ page_obj.previous_page_number }}" class="page-arrow" style="padding: 2px 8px; font-size: 18px;">&#8592;</a>
+                <a href="?{% if search %}search={{ search }}&{% endif %}page=1" class="page-arrow page-arrow-btn">&#171;</a>
+                <a href="?{% if search %}search={{ search }}&{% endif %}page={{ page_obj.previous_page_number }}"
+                    class="page-arrow page-arrow-btn">&#8592;</a>
                 {% else %}
-                    <span class="page-arrow disabled" style="padding: 2px 8px; color: #bbb; font-size: 18px;">&#171;</span>
-                    <span class="page-arrow disabled" style="padding: 2px 8px; color: #bbb; font-size: 18px;">&#8592;</span>
+                <span class="page-arrow page-arrow-btn disabled">&#171;</span>
+                <span class="page-arrow page-arrow-btn disabled">&#8592;</span>
                 {% endif %}
                 {% for i in page_obj.paginator.page_range %}
-                    {% if i > page_obj.number|add:'-5' and i < page_obj.number|add:'5' %}
-                        {% if i == page_obj.number %}
-                            <span class="page-num current" style="padding: 2px 8px; background: #2563eb; color: #fff; border-radius: 4px; font-weight: bold;">{{ i }}</span>
-                        {% else %}
-                            <a href="?{% if search %}search={{ search }}&{% endif %}page={{ i }}" class="page-num" style="padding: 2px 8px; color: #2563eb; border-radius: 4px;">{{ i }}</a>
-                        {% endif %}
+                {% if i > page_obj.number|add:'-5' and i < page_obj.number|add:'5' %} {% if i == page_obj.number %} <span
+                    class="page-num current page-num-current">
+                    {{ i }}</span>
+                    {% else %}
+                    <a href="?{% if search %}search={{ search }}&{% endif %}page={{ i }}" class="page-num page-num-btn">{{ i }}</a>
                     {% endif %}
-                {% endfor %}
-                {% if page_obj.has_next %}
-                    <a href="?{% if search %}search={{ search }}&{% endif %}page={{ page_obj.next_page_number }}" class="page-arrow" style="padding: 2px 8px; font-size: 18px;">&#8594;</a>
-                    <a href="?{% if search %}search={{ search }}&{% endif %}page={{ page_obj.paginator.num_pages }}" class="page-arrow" style="padding: 2px 8px; font-size: 18px;">&#187;</a>
-                {% else %}
-                    <span class="page-arrow disabled" style="padding: 2px 8px; color: #bbb; font-size: 18px;">&#8594;</span>
-                    <span class="page-arrow disabled" style="padding: 2px 8px; color: #bbb; font-size: 18px;">&#187;</span>
-                {% endif %}
+                    {% endif %}
+                    {% endfor %}
+                    {% if page_obj.has_next %}
+                    <a href="?{% if search %}search={{ search }}&{% endif %}page={{ page_obj.next_page_number }}"
+                        class="page-arrow page-arrow-btn">&#8594;</a>
+                    <a href="?{% if search %}search={{ search }}&{% endif %}page={{ page_obj.paginator.num_pages }}"
+                        class="page-arrow page-arrow-btn">&#187;</a>
+                    {% else %}
+                    <span class="page-arrow page-arrow-btn disabled">&#8594;</span>
+                    <span class="page-arrow page-arrow-btn disabled">&#187;</span>
+                    {% endif %}
             </div>
             {% endif %}
         </div>
@@ -90,12 +96,14 @@
                     <td>{{ course.course_name }}</td>
                     <td>{% if course.is_active %}Active{% else %}Inactive{% endif %}</td>
                     <td>
-                        <a href="#" class="course-action-link edit-course-btn" 
-                           data-id="{{ course.id }}" 
-                           data-code="{{ course.course_code }}" 
-                           data-name="{{ course.course_name }}" 
-                           data-active="{{ course.is_active }}"><img src="https://img.icons8.com/?size=100&id=kzmsQM0bM3Bl&format=png&color=000000" alt="Edit" title="Edit Details"></a>
-                        <a href="#" class="course-action-link delete-course-btn" data-id="{{ course.id }}"><img src="https://img.icons8.com/?size=100&id=99971&format=png&color=000000" alt="Delete" title="Delete Student"></a>
+                        <a href="#" class="course-action-link edit-course-btn" data-id="{{ course.id }}"
+                            data-code="{{ course.course_code }}" data-name="{{ course.course_name }}"
+                            data-active="{{ course.is_active }}"><img
+                                src="https://img.icons8.com/?size=100&id=kzmsQM0bM3Bl&format=png&color=000000"
+                                alt="Edit" title="Edit Details"></a>
+                        <a href="#" class="course-action-link delete-course-btn" data-id="{{ course.id }}"><img
+                                src="https://img.icons8.com/?size=100&id=99971&format=png&color=000000" alt="Delete"
+                                title="Delete Student"></a>
                     </td>
                 </tr>
                 {% empty %}
@@ -108,7 +116,7 @@
     </div>
 
     <!-- Edit Course Modal -->
-    <div id="editCourseModal" class="modal" style="display:none; position:fixed; z-index:10000; left:0; top:0; width:100vw; height:100vh; background:rgba(0,0,0,0.4); align-items:center; justify-content:center;">
+    <div id="editCourseModal" class="modal modal-z-10000 modal-backdrop-black-4">
         <div class="edit-form">
             <h2>Edit Course</h2>
             <form id="editCourseForm">
@@ -128,23 +136,23 @@
                         <option value="false">Inactive</option>
                     </select>
                 </div>
-                <div style="text-align:right;">
+                <div class="text-right">
                     <button type="submit">Save</button>
-                    <button type="button" id="closeEditModal" style="margin-right:8px;">Cancel</button>
+                    <button type="button" id="closeEditModal" class="mr-8">Cancel</button>
                 </div>
             </form>
         </div>
     </div>
 
     <!-- Delete Course Modal -->
-    <div id="deleteCourseModal" class="modal" style="display:none; position:fixed; z-index:10000; left:0; top:0; width:100vw; height:100vh; background:rgba(0,0,0,0.4); align-items:center; justify-content:center;">
+    <div id="deleteCourseModal" class="modal modal-z-10000 modal-backdrop-black-4">
         <div class="delete-form">
             <h2>Delete Course</h2>
             <p>Are you sure you want to delete this course?</p>
             <form id="deleteCourseForm">
                 <input type="hidden" id="deleteCourseId" name="id" />
-                <div style="text-align:right;">
-                    <button type="button" id="closeDeleteModal" style="margin-right:8px;">Cancel</button>
+                <div class="text-right">
+                    <button type="button" id="closeDeleteModal" class="mr-8">Cancel</button>
                     <button type="submit">Delete</button>
                 </div>
             </form>
@@ -155,46 +163,46 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="{% static 'js/scripts.js' %}"></script>
 <script>
-const courseFilterForm = document.getElementById('courseFilterForm');
-const courseSearchInput = document.getElementById('search');
-const courseList = document.getElementById('course-list');
-const coursePaginationBar = document.querySelector('.pagination-bar');
-const resetCourseBtn = document.getElementById('resetCourseFilters');
+    const courseFilterForm = document.getElementById('courseFilterForm');
+    const courseSearchInput = document.getElementById('search');
+    const courseList = document.getElementById('course-list');
+    const coursePaginationBar = document.querySelector('.pagination-bar');
+    const resetCourseBtn = document.getElementById('resetCourseFilters');
 
-let courseAjaxTimeout = null;
-function fetchCourseData(page = 1) {
-    const search = courseSearchInput.value;
-    const params = new URLSearchParams({type: 'course', search, page});
-    fetch('/masters/ajax/?' + params.toString(), {headers: {'X-Requested-With': 'XMLHttpRequest'}})
-        .then(r => r.json())
-        .then(data => {
-            courseList.innerHTML = data.table_html;
-            coursePaginationBar.innerHTML = data.pagination_html;
-            attachCoursePaginationEvents();
+    let courseAjaxTimeout = null;
+    function fetchCourseData(page = 1) {
+        const search = courseSearchInput.value;
+        const params = new URLSearchParams({ type: 'course', search, page });
+        fetch('/masters/ajax/?' + params.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(r => r.json())
+            .then(data => {
+                courseList.innerHTML = data.table_html;
+                coursePaginationBar.innerHTML = data.pagination_html;
+                attachCoursePaginationEvents();
+            });
+    }
+
+    function instantCourseFilter() {
+        clearTimeout(courseAjaxTimeout);
+        courseAjaxTimeout = setTimeout(() => fetchCourseData(1), 250);
+    }
+
+    courseSearchInput.addEventListener('input', instantCourseFilter);
+
+    function attachCoursePaginationEvents() {
+        coursePaginationBar.querySelectorAll('a[data-page]').forEach(a => {
+            a.addEventListener('click', function (e) {
+                e.preventDefault();
+                const page = this.getAttribute('data-page');
+                fetchCourseData(page);
+            });
         });
-}
+    }
+    attachCoursePaginationEvents();
 
-function instantCourseFilter() {
-    clearTimeout(courseAjaxTimeout);
-    courseAjaxTimeout = setTimeout(() => fetchCourseData(1), 250);
-}
-
-courseSearchInput.addEventListener('input', instantCourseFilter);
-
-function attachCoursePaginationEvents() {
-    coursePaginationBar.querySelectorAll('a[data-page]').forEach(a => {
-        a.addEventListener('click', function(e) {
-            e.preventDefault();
-            const page = this.getAttribute('data-page');
-            fetchCourseData(page);
-        });
+    resetCourseBtn.addEventListener('click', function () {
+        courseSearchInput.value = '';
+        fetchCourseData(1);
     });
-}
-attachCoursePaginationEvents();
-
-resetCourseBtn.addEventListener('click', function() {
-    courseSearchInput.value = '';
-    fetchCourseData(1);
-});
 </script>
 {% endblock %}

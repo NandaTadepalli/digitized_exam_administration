@@ -5,21 +5,21 @@
     <form method="post">
         {% csrf_token %}
         {% if mismatches %}
-            <label style="font-weight: bold; font-size: 1.1em;">
-                <input type="checkbox" id="select-all" style="margin-right: 8px;">Select All
+            <label class="bold font-1-1em">
+                <input type="checkbox" id="select-all" class="mr-8">Select All
             </label>
             {% for row, db_row in mismatches %}
-                <div class="conflict-block" style="margin-bottom: 32px; border: 1px solid #f59e42; border-radius: 8px; padding: 18px;">
-                    <label style="font-weight: bold; font-size: 1.1em;">
-                        <input type="checkbox" name="update_program" value="{{ row.0 }}" class="select-item" style="margin-right: 8px;">
+                <div class="conflict-block">
+                    <label class="bold font-1-1em">
+                        <input type="checkbox" name="update_program" value="{{ row.0 }}" class="select-item mr-8">
                         {{ row.0 }}
                     </label>
-                    <table style="margin-top: 10px; width: 100%; border-collapse: collapse;">
+                    <table class="mt-10 w-100 border-collapse">
                         <thead>
-                            <tr style="background: #f8fafc;">
-                                <th style="padding: 6px 12px; border: 1px solid #e5e7eb;">Field</th>
-                                <th style="padding: 6px 12px; border: 1px solid #e5e7eb;">Old Value</th>
-                                <th style="padding: 6px 12px; border: 1px solid #e5e7eb; color: #ef4444;">New Value</th>
+                            <tr class="bg-f8">
+                                <th class="p-6-12 border-e5">Field</th>
+                                <th class="p-6-12 border-e5">Old Value</th>
+                                <th class="p-6-12 border-e5 text-ef">New Value</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -32,12 +32,12 @@
                     </table>
                 </div>
             {% endfor %}
-            <button type="submit" class="control-btn" style="background: #f59e42; color: #fff; font-weight: bold;">Update Selected</button>
+            <button type="submit" class="control-btn bg-f5-orange">Update Selected</button>
         {% else %}
             <p>No mismatched programs found.</p>
         {% endif %}
     </form>
-    <a href="{% url 'core:settings' %}" class="action-link" style="margin-top: 18px; display: inline-block;">Back to Settings</a>
+    <a href="{% url 'core:settings' %}" class="action-link mt-18 action-link-inline">Back to Settings</a>
 </div>
 <script>
 document.getElementById('select-all').onclick = function() {

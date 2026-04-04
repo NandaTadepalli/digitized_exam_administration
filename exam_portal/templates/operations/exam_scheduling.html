@@ -1,44 +1,55 @@
 {% extends "core/base_admin.html" %}
 {% load static %}
 {% block content %}
-    <div class="pages-main">
-        <h1 class="pages-main-head">Exam Scheduling Details</h1>
-        <div class="controls-1" style="display: flex; flex-wrap: wrap; gap: 20px; background: #f8fafc; border-radius: 12px;margin-bottom: 5px;">
-            <div class="readonly-field" style="min-width: 220px;"><label>Exam Name:</label> <span>{{ exam_name }}</span></div>
-            <div class="readonly-field" style="min-width: 220px;"><label>Exam Type:</label> <span>{{ slot.exam_type }}</span></div>
-            <div class="readonly-field" style="min-width: 220px;"><label>Mode:</label> <span>{{ slot.mode }}</span></div>
-            <div class="readonly-field" style="min-width: 220px;"><label>Exam Date:</label> <span>{{ slot.exam_date }}</span></div>
-            <div class="readonly-field" style="min-width: 220px;"><label>Start Time:</label> <span>{{ slot.start_time }}</span></div>
-            <div class="readonly-field" style="min-width: 220px;"><label>End Time:</label> <span>{{ slot.end_time }}</span></div>
-            <div class="readonly-field" style="min-width: 220px;"><label>Slot Code:</label> <span>{{ slot.slot_code }}</span></div>
-            <div class="readonly-field" style="min-width: 220px;"><label>Academic Year:</label> <span>{{ slot.examination.academic_year }}</span></div>
-            <div class="readonly-field" style="min-width: 220px;"><label>Semester:</label> <span>{{ slot.examination.semester }}</span></div>
+<div class="pages-main">
+    <h1 class="pages-main-head">Exam Scheduling Details</h1>
+    <div class="controls-1 controls-flex-wrap mb-5">
+        <div class="readonly-field min-w-220"><label>Exam Name:</label> <span>{{ exam_name }}</span>
         </div>
-
-        <!-- Filters removed. Data will be auto-fetched based on academic year and semester from examinations table. -->
-        <form id="examScheduleGroupsForm" method="post" action="" data-slot-id="{{ slot.id }}" data-academic-year="{{ slot.examination.academic_year }}" data-semester="{{ slot.examination.semester }}" data-regulation="{{ slot.regulation|default:'' }}">
-            {% csrf_token %}
-            <div class="table-responsive" style="overflow-x:auto;">
-                <div style="max-height:65vh; overflow-y:auto;">
-                    <table id="exam-schedule-groups-table">
-                        <thead style="position:sticky; top:0; background:#f8fafc; z-index:2;">
-                            <tr>
-                                <th><input type="checkbox" id="selectAllGroups"></th>
-                                <th>Course Code</th>
-                                <th>Course Name</th>
-                                <th>Regulation/Batch</th>
-                                <th>Academic Year</th>
-                                <th>Semester</th>
-                                <th>Registered Students</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- Table body will be filled by JS -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <button type="submit" class="control-btn" id="confirmScheduleBtn" style="display:none;">Confirm Scheduling for Selected Groups</button>
-        </form>
+        <div class="readonly-field min-w-220"><label>Exam Type:</label> <span>{{ slot.exam_type
+                }}</span></div>
+        <div class="readonly-field min-w-220"><label>Mode:</label> <span>{{ slot.mode }}</span></div>
+        <div class="readonly-field min-w-220"><label>Exam Date:</label> <span>{{ slot.exam_date
+                }}</span></div>
+        <div class="readonly-field min-w-220"><label>Start Time:</label> <span>{{ slot.start_time
+                }}</span></div>
+        <div class="readonly-field min-w-220"><label>End Time:</label> <span>{{ slot.end_time }}</span>
+        </div>
+        <div class="readonly-field min-w-220"><label>Slot Code:</label> <span>{{ slot.slot_code
+                }}</span></div>
+        <div class="readonly-field min-w-220"><label>Academic Year:</label> <span>{{
+                slot.examination.academic_year }}</span></div>
+        <div class="readonly-field min-w-220"><label>Semester:</label> <span>{{
+                slot.examination.semester }}</span></div>
     </div>
+
+    <!-- Filters removed. Data will be auto-fetched based on academic year and semester from examinations table. -->
+    <form id="examScheduleGroupsForm" method="post" action="" data-slot-id="{{ slot.id }}"
+        data-academic-year="{{ slot.examination.academic_year }}" data-semester="{{ slot.examination.semester }}"
+        data-regulation="{{ slot.regulation|default:'' }}">
+        {% csrf_token %}
+        <div class="table-responsive overflow-x-auto">
+            <div class="max-h-65vh">
+                <table id="exam-schedule-groups-table">
+                    <thead class="sticky-header-f8">
+                        <tr>
+                            <th><input type="checkbox" id="selectAllGroups"></th>
+                            <th>Course Code</th>
+                            <th>Course Name</th>
+                            <th>Regulation/Batch</th>
+                            <th>Academic Year</th>
+                            <th>Semester</th>
+                            <th>Registered Students</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Table body will be filled by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <button type="submit" class="control-btn" id="confirmScheduleBtn" class="d-none">Confirm Scheduling for
+            Selected Groups</button>
+    </form>
+</div>
 {% endblock %}

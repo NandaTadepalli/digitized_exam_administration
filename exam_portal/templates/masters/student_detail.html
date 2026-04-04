@@ -1,11 +1,11 @@
-{% extends "core/base_student.html" %}
+{% extends base_template %}
 {% load static %}
 {% block content %}
     <div class="pages-main">
         <div class="view-page">
             <h1 class="pages-main-head">{{ student.student_id }} - {{ student.user.first_name }} {{ student.user.last_name }}</h1>
             <h2>Student Details</h2>
-            <p style="color:red;"><strong>Note:</strong> This page displays the details of the selected student.</p>
+            <p class="text-red"><strong>Note:</strong> This page displays the details of the selected student.</p>
             <div class="view-actions">
                 <table class="details-table">
                     <thead>
@@ -19,7 +19,7 @@
                         <tr><td>Name</td><td>{{ student.user.first_name }} {{ student.user.last_name }}</td></tr>
                         <tr><td>Program</td><td>{{ student.program.program_name }} ({{ student.program.program_code }})</td></tr>
                         <tr><td>Department</td><td>{{ student.dept.dept_name }} ({{ student.dept.dept_code }})</td></tr>
-                        <tr><td>Regulation</td><td>{% if student.batch %}{{ student.batch.batch_code }} ({{ student.batch.admission_year }}-{{ student.batch.grad_year }}){% else %}<span style="color:red">Not set</span>{% endif %}</td></tr>
+                        <tr><td>Regulation</td><td>{% if student.batch %}{{ student.batch.batch_code }} ({{ student.batch.admission_year }}-{{ student.batch.grad_year }}){% else %}<span class="text-red">Not set</span>{% endif %}</td></tr>
                         <tr><td>Email</td><td>{{ student.email }}</td></tr>
                         <tr><td>Contact</td><td>{{ student.phone_number }}</td></tr>
                         <tr><td>Parent Contact</td><td>{{ student.parent_phone_number }}</td></tr>
@@ -27,7 +27,7 @@
                     </tbody>
                 </table>
             </div>
-            <a href="{% url 'masters:student' %}" class="action-link student-action-link">Back</a>
+            <a href="javascript:history.back()" class="action-link student-action-link">Back</a>
         </div>
     </div>
 {% endblock %}

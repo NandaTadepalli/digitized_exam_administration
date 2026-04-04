@@ -11,6 +11,186 @@ import json
 from .models import Batch, Student, Faculty, Room, Department, Course
 from accounts.models import User
 from operations.models import StudentCourse
+from operations.models import InvigilationDuty, ExamSlot, Examinations, Exam, Room
+from datetime import datetime, timedelta
+
+# Faculty dashboard view
+@login_required(login_url='/accounts/login/')
+def faculty_dashboard(request):
+    return render(request, "core/faculty_dashboard.html")
+
+# Invigilation Duties view for faculty
+@login_required(login_url='/accounts/login/')
+def invigilation_duties(request):
+    user = request.user
+    # Only allow faculty
+    if not hasattr(user, 'role') or user.role.lower() != 'faculty':
+        return redirect('core:dashboard')
+    from operations.models import InvigilationDuty, ExamSlot, Examinations, Exam, Room
+    from masters.models import Course, Faculty
+    from datetime import datetime, timedelta
+    duties_raw = InvigilationDuty.objects.filter(faculty__user=user).select_related('exam_slot', 'room', 'faculty')
+    duties = []
+    for duty in duties_raw:
+        slot = duty.exam_slot
+        # Only show if the exam is published
+        if not slot.examination or not slot.examination.published:
+            continue
+        exam_obj = Exam.objects.filter(exam_slot=slot).select_related('course').first()
+        exam_name = slot.examination.exam_name if slot.examination else ''
+        course_code = exam_obj.course.course_code if exam_obj and exam_obj.course else ''
+        course_name = exam_obj.course.course_name if exam_obj and exam_obj.course else ''
+        room_no = duty.room.room_code if duty.room else ''
+        exam_date = slot.exam_date if slot.exam_date else None
+        start_time = slot.start_time if slot.start_time else None
+        end_time = slot.end_time if slot.end_time else None
+        duration = ''
+        if start_time and end_time:
+            # Calculate duration as timedelta
+            dt1 = datetime.combine(exam_date, start_time)
+            dt2 = datetime.combine(exam_date, end_time)
+            diff = dt2 - dt1
+            hours = diff.seconds // 3600
+            minutes = (diff.seconds // 60) % 60
+            if hours and minutes:
+                duration = f"{hours} hr {minutes} min"
+            elif hours:
+                duration = f"{hours} hr"
+            elif minutes:
+                duration = f"{minutes} min"
+            else:
+                duration = "-"
+        duties.append({
+            'exam_name': exam_name,
+            'faculty_id': duty.faculty.faculty_id,
+            'exam_date': exam_date,
+            'exam_type': slot.exam_type,
+            'course_code': course_code,
+            'course_name': course_name,
+            'room_no': room_no,
+            'start_time': start_time,
+            'end_time': end_time,
+            'exam_slot': slot.slot_code,
+            'duration': duration,
+            'status': 'completed' if exam_date and exam_date < datetime.now().date() else 'upcoming',
+            'exam_slot_id': slot.id,
+            'room_id': duty.room.id if duty.room else '',
+        })
+    context = {
+        'duties': duties,
+        'user': user,
+    }
+    return render(request, 'masters/invigilation_duties.html', context)
+
+@login_required(login_url='/accounts/login/')
+def facultyview_seatingplan(request):
+    user = request.user
+    if not hasattr(user, 'role') or user.role.lower() != 'faculty':
+        return redirect('core:dashboard')
+    duties_raw = InvigilationDuty.objects.filter(faculty__user=user).select_related('exam_slot', 'room', 'faculty')
+    duties = []
+    
+    from operations.models import Attendance, Exam, ExamSlot, Room
+    from datetime import datetime, timedelta
+    
+    for duty in duties_raw:
+        slot = duty.exam_slot
+        if not slot.examination or not slot.examination.published:
+            continue
+        
+        exam_obj = Exam.objects.filter(exam_slot=slot).select_related('course').first()
+        exam_name = slot.examination.exam_name if slot.examination else ''
+        course_code = exam_obj.course.course_code if exam_obj and exam_obj.course else ''
+        course_name = exam_obj.course.course_name if exam_obj and exam_obj.course else ''
+        room_no = duty.room.room_code if duty.room else ''
+        exam_date = slot.exam_date if slot.exam_date else None
+        start_time = slot.start_time if slot.start_time else None
+        end_time = slot.end_time if slot.end_time else None
+        duration = ''
+        
+        if start_time and end_time:
+            dt1 = datetime.combine(exam_date, start_time)
+            dt2 = datetime.combine(exam_date, end_time)
+            diff = dt2 - dt1
+            hours = diff.seconds // 3600
+            minutes = (diff.seconds // 60) % 60
+            if hours and minutes:
+                duration = f"{hours} hr {minutes} min"
+            elif hours:
+                duration = f"{hours} hr"
+            elif minutes:
+                duration = f"{minutes} min"
+            else:
+                duration = "-"
+
+        # Attendance Status Logic
+        has_posted = Attendance.objects.filter(
+            marked_by=duty.faculty, 
+            student_exam__exam__exam_slot=slot,
+            room=duty.room
+        ).exists()
+
+        now = datetime.now()
+        exam_start = datetime.combine(exam_date, start_time)
+        exam_end = datetime.combine(exam_date, end_time)
+        exam_start_30m = exam_start + timedelta(minutes=30)
+
+        att_status = 'UPCOMING'
+        att_label = 'Post Attendance'
+        btn_class = 'btn-secondary disabled'
+        can_click = False
+
+        if now < exam_start:
+            att_status = 'UPCOMING'
+            att_label = 'Upcoming'
+        elif now > exam_end:
+            att_status = 'VIEW'
+            att_label = 'View Attendance'
+            btn_class = 'btn-info'
+            can_click = True
+        else:
+            if has_posted:
+                att_status = 'EDIT'
+                att_label = 'Edit Attendance'
+                btn_class = 'btn-warning'
+                can_click = True
+            else:
+                if now <= exam_start_30m:
+                    att_status = 'POST'
+                    att_label = 'Post Attendance'
+                    btn_class = 'btn-secondary'
+                    can_click = True
+                else:
+                    att_status = 'LATE'
+                    att_label = 'Post Window Closed'
+                    btn_class = 'btn-danger disabled'
+                    can_click = False
+
+        duties.append({
+            'exam_name': exam_name,
+            'faculty_id': duty.faculty.faculty_id,
+            'exam_date': exam_date,
+            'exam_type': slot.exam_type,
+            'course_code': course_code,
+            'course_name': course_name,
+            'room_no': room_no,
+            'start_time': start_time,
+            'end_time': end_time,
+            'exam_slot': slot.slot_code,
+            'duration': duration,
+            'attendance_status': att_status,
+            'attendance_label': att_label,
+            'btn_class': btn_class,
+            'can_click': can_click,
+            'exam_slot_id': slot.id,
+            'room_id': duty.room.id if duty.room else '',
+        })
+    
+    context = {
+        'duties': duties,
+        'user': user,
+    }
+    return render(request, 'operations/facultyview_seatingplan.html', context)
 
 # Simple batch list view for redirection
 @login_required
@@ -560,13 +740,19 @@ def student(request):
     paginator = Paginator(students, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
+    # Role-based base template
+    if hasattr(request.user, 'role') and request.user.role == 'faculty':
+        base_template = "core/base_faculty.html"
+    else:
+        base_template = "core/base_admin.html"
     return render(request, "masters/student.html", {
         "page_obj": page_obj,
         "departments": departments,
         "batches": batches,
         "search": search,
         "selected_department": department,
-        "selected_batch": batch
+        "selected_batch": batch,
+        "base_template": base_template
     })
 
 @login_required
@@ -577,7 +763,16 @@ def student_content(request):
 def student_detail(request, pk):
     from .models import Student
     student = Student.objects.select_related('user', 'dept', 'program').get(pk=pk)
-    return render(request, "masters/student_detail.html", {"student": student})
+    if hasattr(request.user, 'role'):
+        if request.user.role == 'faculty':
+            base_template = "core/base_faculty.html"
+        elif request.user.role == 'student':
+            base_template = "core/base_student.html"
+        else:
+            base_template = "core/base_admin.html"
+    else:
+        base_template = "core/base_admin.html" if request.user.is_staff or request.user.is_superuser else "core/base_student.html"
+    return render(request, "masters/student_detail.html", {"student": student, "base_template": base_template})
 
 @login_required
 def student_edit(request, pk):
@@ -658,7 +853,16 @@ def faculty_content(request):
 def faculty_detail(request, pk):
     from django.shortcuts import get_object_or_404
     faculty = get_object_or_404(Faculty.objects.select_related('user', 'dept'), pk=pk)
-    return render(request, "masters/faculty_detail.html", {"faculty": faculty})
+    if hasattr(request.user, 'role'):
+        if request.user.role == 'student':
+            base_template = "core/base_student.html"
+        elif request.user.role == 'faculty':
+            base_template = "core/base_faculty.html"
+        else:
+            base_template = "core/base_admin.html"
+    else:
+        base_template = "core/base_admin.html" if request.user.is_staff or request.user.is_superuser else "core/base_faculty.html"
+    return render(request, "masters/faculty_detail.html", {"faculty": faculty, "base_template": base_template})
 
 @login_required
 def faculty_detail_content(request, pk):
@@ -1106,36 +1310,44 @@ def course_upload(request):
 @login_required(login_url='/accounts/login/')
 def coursereg(request):
     user = request.user
-    if hasattr(user, 'role') and user.role == 'student':
-        try:
-            student = user.student_profile
-        except Student.DoesNotExist:
-            return render(request, "masters/coursereg.html", {"courseregs": [], "user": user, "base_template": "core/base_student.html"})
-        courseregs = StudentCourse.objects.select_related('student', 'course').filter(student=student)
-        courses = Course.objects.order_by('course_code').all()
-        academic_years = sorted(set(courseregs.values_list('academic_year', flat=True)))
-        semesters = sorted(set(courseregs.values_list('semester', flat=True)), key=str)
-        return render(request, "masters/coursereg.html", {
-            "courseregs": courseregs,
-            "courses": courses,
-            "academic_years": academic_years,
-            "semesters": semesters,
-            "user": user,
-            "base_template": "core/base_student.html"
-        })
+    if hasattr(user, 'role'):
+        role = user.role.lower() if hasattr(user, 'role') and user.role else ''
+        if role in ['student', 'Student', 'STUDENT']:
+            try:
+                student = user.student_profile
+            except Student.DoesNotExist:
+                return render(request, "masters/coursereg.html", {"courseregs": [], "user": user, "base_template": "core/base_student.html"})
+            courseregs = StudentCourse.objects.select_related('student', 'course').filter(student=student)
+            courses = Course.objects.order_by('course_code').all()
+            academic_years = sorted(set(courseregs.values_list('academic_year', flat=True)))
+            semesters = sorted(set(courseregs.values_list('semester', flat=True)), key=str)
+            base_template = "core/base_student.html"
+        elif role == 'faculty':
+            courseregs = StudentCourse.objects.select_related('student', 'course').all()
+            courses = Course.objects.order_by('course_code').all()
+            academic_years = sorted(set(courseregs.values_list('academic_year', flat=True)))
+            semesters = sorted(set(courseregs.values_list('semester', flat=True)), key=str)
+            base_template = "core/base_faculty.html"
+        else:
+            courseregs = StudentCourse.objects.select_related('student', 'course').all()
+            courses = Course.objects.order_by('course_code').all()
+            academic_years = sorted(set(courseregs.values_list('academic_year', flat=True)))
+            semesters = sorted(set(courseregs.values_list('semester', flat=True)), key=str)
+            base_template = "core/base_admin.html"
     else:
         courseregs = StudentCourse.objects.select_related('student', 'course').all()
         courses = Course.objects.order_by('course_code').all()
         academic_years = sorted(set(courseregs.values_list('academic_year', flat=True)))
         semesters = sorted(set(courseregs.values_list('semester', flat=True)), key=str)
-        return render(request, "masters/coursereg.html", {
-            "courseregs": courseregs,
-            "courses": courses,
-            "academic_years": academic_years,
-            "semesters": semesters,
-            "user": user,
-            "base_template": "core/base_admin.html"
-        })
+        base_template = "core/base_admin.html" if user.is_staff or user.is_superuser else "core/base_student.html"
+    return render(request, "masters/coursereg.html", {
+        "courseregs": courseregs,
+        "courses": courses,
+        "academic_years": academic_years,
+        "semesters": semesters,
+        "user": user,
+        "base_template": base_template
+    })
 
 @login_required
 def coursereg_upload(request):

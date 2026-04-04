@@ -17,7 +17,7 @@
                             <label for="uploadUsersFile" class="settings-card-link">
                                 <img src="https://img.icons8.com/?size=100&id=82888&format=png&color=000000" alt="upload"> Upload
                             </label>
-                            <input type="file" id="uploadUsersFile" name="users_file" style="display: none;" accept=".csv, .xlsx" onchange="this.form.submit();">
+                            <input type="file" id="uploadUsersFile" name="users_file" class="d-none" accept=".csv, .xlsx" onchange="this.form.submit();">
                         </form>
                     </div>
                     <a href="{% static 'samples/usersdata.csv' %}" download class="settings-card-link">
@@ -38,7 +38,7 @@
                             <label for="uploadDepartmentsFile" class="settings-card-link">
                                 <img src="https://img.icons8.com/?size=100&id=82888&format=png&color=000000" alt="upload"> Upload
                             </label>
-                            <input type="file" id="uploadDepartmentsFile" name="departments_file" style="display: none;" accept=".csv, .xlsx" onchange="this.form.submit();">
+                            <input type="file" id="uploadDepartmentsFile" name="departments_file" class="d-none" accept=".csv, .xlsx" onchange="this.form.submit();">
                         </form>
                     </div>
                     <a href="{% static 'samples/departments.csv' %}" download class="settings-card-link">
@@ -59,7 +59,7 @@
                             <label for="uploadProgramsFile" class="settings-card-link">
                                 <img src="https://img.icons8.com/?size=100&id=82888&format=png&color=000000" alt="upload"> Upload
                             </label>
-                            <input type="file" id="uploadProgramsFile" name="programs_file" style="display: none;" accept=".csv, .xlsx" onchange="this.form.submit();">
+                            <input type="file" id="uploadProgramsFile" name="programs_file" class="d-none" accept=".csv, .xlsx" onchange="this.form.submit();">
                         </form>
                     </div>
                     <a href="{% static 'samples/programs.csv' %}" download class="settings-card-link">
@@ -80,7 +80,7 @@
                             <label for="uploadBatchesFile" class="settings-card-link">
                                 <img src="https://img.icons8.com/?size=100&id=82888&format=png&color=000000" alt="upload"> Upload
                             </label>
-                            <input type="file" id="uploadBatchesFile" name="csv_file" style="display: none;" accept=".csv, .xlsx" onchange="this.form.submit();">
+                            <input type="file" id="uploadBatchesFile" name="csv_file" class="d-none" accept=".csv, .xlsx" onchange="this.form.submit();">
                         </form>
                     </div>
                     <a href="{% static 'samples/batches.csv' %}" download class="settings-card-link">
@@ -88,30 +88,30 @@
                     </a>
                 </div>
             <!-- Modal structure for Users -->
-            <div id="usersModal" class="modal-popup" style="display:none;position:fixed;z-index:9999;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.3);justify-content:center;align-items:center;">
-                <div class="modal-content" style="background:#fff;width:90vw;height:90vh;overflow:auto;position:relative;padding:24px;border-radius:12px;">
-                    <button class="close-modal" style="position:absolute;top:12px;right:18px;font-size:2rem;">&times;</button>
+            <div id="usersModal" class="modal-popup modal-overlay-flex">
+                <div class="modal-content modal-content-90">
+                    <button class="close-modal close-modal-upper-right">&times;</button>
                     <div id="users-modal-table"></div>
                 </div>
             </div>
             <!-- Modal structure for Departments -->
-            <div id="departmentsModal" class="modal-popup" style="display:none;position:fixed;z-index:9999;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.3);justify-content:center;align-items:center;">
-                <div class="modal-content" style="background:#fff;width:90vw;height:90vh;overflow:auto;position:relative;padding:24px;border-radius:12px;">
-                    <button class="close-modal" style="position:absolute;top:12px;right:18px;font-size:2rem;">&times;</button>
+            <div id="departmentsModal" class="modal-popup modal-overlay-flex">
+                <div class="modal-content modal-content-90">
+                    <button class="close-modal close-modal-upper-right">&times;</button>
                     <div id="departments-modal-table"></div>
                 </div>
             </div>
             <!-- Modal structure for Programs -->
-            <div id="programsModal" class="modal-popup" style="display:none;position:fixed;z-index:9999;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.3);justify-content:center;align-items:center;">
-                <div class="modal-content" style="background:#fff;width:90vw;height:90vh;overflow:auto;position:relative;padding:24px;border-radius:12px;">
-                    <button class="close-modal" style="position:absolute;top:12px;right:18px;font-size:2rem;">&times;</button>
+            <div id="programsModal" class="modal-popup modal-overlay-flex">
+                <div class="modal-content modal-content-90">
+                    <button class="close-modal close-modal-upper-right">&times;</button>
                     <div id="programs-modal-table"></div>
                 </div>
             </div>
             <!-- Modal structure for Batches -->
-            <div id="batchesModal" class="modal-popup" style="display:none;position:fixed;z-index:9999;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.3);justify-content:center;align-items:center;">
-                <div class="modal-content" style="background:#fff;width:90vw;height:90vh;overflow:auto;position:relative;padding:24px;border-radius:12px;">
-                    <button class="close-modal" style="position:absolute;top:12px;right:18px;font-size:2rem;">&times;</button>
+            <div id="batchesModal" class="modal-popup modal-overlay-flex">
+                <div class="modal-content modal-content-90">
+                    <button class="close-modal close-modal-upper-right">&times;</button>
                     <div id="batches-modal-table"></div>
                 </div>
             </div>

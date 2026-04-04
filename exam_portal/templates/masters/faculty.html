@@ -5,17 +5,19 @@
     <h1 class="pages-main-head">Faculty Management</h1>
     <div class="note-and-actions">
         <div class="note-text">
-            <p style="color: red;"><strong>Note:</strong> Upload faculty data in <strong>.csv</strong> format.
+            <p class="text-red"><strong>Note:</strong> Upload faculty data in <strong>.csv</strong> format.
             </p>
-            <p style="color: red;">(Download the sample .csv file and add data in the specified structure to
+            <p class="text-red">(Download the sample .csv file and add data in the specified structure to
                 avoid errors)</p>
         </div>
         <div class="add-data">
             <a class="control-btn" href="#">Add new faculty</a>
-            <form action="{% url 'masters:faculty_upload' %}" method="post" enctype="multipart/form-data" style="display:inline;">
+            <form action="{% url 'masters:faculty_upload' %}" method="post" enctype="multipart/form-data"
+                class="d-inline">
                 {% csrf_token %}
-                <label for="uploadFile" class="control-btn" style="cursor: pointer;">Upload File</label>
-                <input type="file" id="uploadFile" name="csv_file" style="display: none;" accept=".csv" onchange="this.form.submit()">
+                <label for="uploadFile" class="control-btn cursor-pointer">Upload File</label>
+                <input type="file" id="uploadFile" name="csv_file" class="d-none" accept=".csv"
+                    onchange="this.form.submit()">
             </form>
             <a href="{% static 'samples/facultydata.csv' %}" download class="control-btn">Download Sample CSV</a>
         </div>
@@ -24,45 +26,52 @@
     <div class="controls">
         <form method="get" action="" id="facultyFilterForm">
             <label for="search">Search Faculty:</label>
-            <input type="text" id="search" name="search" placeholder="Enter Faculty name or ID" value="{{ search|default:'' }}" />
+            <input type="text" id="search" name="search" placeholder="Enter Faculty name or ID"
+                value="{{ search|default:'' }}" />
 
             <label for="department">Department:</label>
             <select id="department" name="department">
-                <option value="all" {% if selected_department|default:'all' == 'all' %}selected{% endif %}>All Departments</option>
+                <option value="all" {% if selected_department|default:'all' == 'all' %}selected{% endif %}>All Departments
+                </option>
                 {% for dept in departments %}
-                    <option value="{{ dept.dept_code }}" {% if dept.dept_code == selected_department %}selected{% endif %}>{{ dept.dept_name }} ({{ dept.dept_code }})</option>
+                <option value="{{ dept.dept_code }}" {% if dept.dept_code == selected_department %}selected{% endif %}>{{ dept.dept_name }} ({{ dept.dept_code }})</option>
                 {% endfor %}
             </select>
-            <button type="submit" style="display:none"></button>
+            <button type="submit" class="d-none"></button>
         </form>
     </div>
 
-    <div class="actions" style="display: flex; align-items: center; gap: 16px;">
-        <div class="pagination-bar" style="flex:1;">
+    <div class="actions actions-flex-gap-16">
+        <div class="pagination-bar flex-1">
             {% if page_obj %}
-            <div class="pagination" style="display: flex; align-items: center; gap: 4px;">
+            <div class="pagination pagination-flex-gap-4">
                 {% if page_obj.has_previous %}
-                    <a href="?{% if search %}search={{ search }}&{% endif %}{% if selected_department %}department={{ selected_department }}&{% endif %}page=1" class="page-arrow" style="padding: 2px 8px; font-size: 18px;">&#171;</a>
-                    <a href="?{% if search %}search={{ search }}&{% endif %}{% if selected_department %}department={{ selected_department }}&{% endif %}page={{ page_obj.previous_page_number }}" class="page-arrow" style="padding: 2px 8px; font-size: 18px;">&#8592;</a>
+                <a href="?{% if search %}search={{ search }}&{% endif %}{% if selected_department %}department={{ selected_department }}&{% endif %}page=1"
+                    class="page-arrow page-arrow-btn">&#171;</a>
+                <a href="?{% if search %}search={{ search }}&{% endif %}{% if selected_department %}department={{ selected_department }}&{% endif %}page={{ page_obj.previous_page_number }}"
+                    class="page-arrow page-arrow-btn">&#8592;</a>
                 {% else %}
-                    <span class="page-arrow disabled" style="padding: 2px 8px; color: #bbb; font-size: 18px;">&#171;</span>
-                    <span class="page-arrow disabled" style="padding: 2px 8px; color: #bbb; font-size: 18px;">&#8592;</span>
+                <span class="page-arrow page-arrow-btn disabled">&#171;</span>
+                <span class="page-arrow page-arrow-btn disabled">&#8592;</span>
                 {% endif %}
                 {% for i in page_obj.paginator.page_range %}
-                    {% if i > page_obj.number|add:'-5' and i < page_obj.number|add:'5' %}
-                        {% if i == page_obj.number %}
-                            <span class="page-num current" style="padding: 2px 8px; background: #2563eb; color: #fff; border-radius: 4px; font-weight: bold;">{{ i }}</span>
-                        {% else %}
-                            <a href="?{% if search %}search={{ search }}&{% endif %}{% if selected_department %}department={{ selected_department }}&{% endif %}page={{ i }}" class="page-num" style="padding: 2px 8px; color: #2563eb; border-radius: 4px;">{{ i }}</a>
-                        {% endif %}
+                {% if i > page_obj.number|add:'-5' and i < page_obj.number|add:'5' %} {% if i == page_obj.number %} <span
+                    class="page-num current page-num-current">
+                    {{ i }}</span>
+                    {% else %}
+                    <a href="?{% if search %}search={{ search }}&{% endif %}{% if selected_department %}department={{ selected_department }}&{% endif %}page={{ i }}"
+                        class="page-num page-num-btn">{{ i }}</a>
                     {% endif %}
-                {% endfor %}
-                {% if page_obj.has_next %}
-                    <a href="?{% if search %}search={{ search }}&{% endif %}{% if selected_department %}department={{ selected_department }}&{% endif %}page={{ page_obj.next_page_number }}" class="page-arrow" style="padding: 2px 8px; font-size: 18px;">&#8594;</a>
-                    <a href="?{% if search %}search={{ search }}&{% endif %}{% if selected_department %}department={{ selected_department }}&{% endif %}page={{ page_obj.paginator.num_pages }}" class="page-arrow" style="padding: 2px 8px; font-size: 18px;">&#187;</a>
+                    {% endif %}
+                    {% endfor %}
+                    {% if page_obj.has_next %}
+                    <a href="?{% if search %}search={{ search }}&{% endif %}{% if selected_department %}department={{ selected_department }}&{% endif %}page={{ page_obj.next_page_number }}"
+                        class="page-arrow page-arrow-btn">&#8594;</a>
+                    <a href="?{% if search %}search={{ search }}&{% endif %}{% if selected_department %}department={{ selected_department }}&{% endif %}page={{ page_obj.paginator.num_pages }}"
+                        class="page-arrow page-arrow-btn">&#187;</a>
                 {% else %}
-                    <span class="page-arrow disabled" style="padding: 2px 8px; color: #bbb; font-size: 18px;">&#8594;</span>
-                    <span class="page-arrow disabled" style="padding: 2px 8px; color: #bbb; font-size: 18px;">&#187;</span>
+                    <span class="page-arrow page-arrow-btn disabled">&#8594;</span>
+                    <span class="page-arrow page-arrow-btn disabled">&#187;</span>
                 {% endif %}
             </div>
             {% endif %}
@@ -98,24 +107,28 @@
                 {% for faculty in page_obj %}
                 <tr>
                     <td>{{ forloop.counter0|add:page_obj.start_index }}</td>
-                    <td><a href="{% url 'masters:faculty_detail' faculty.id %}" class="faculty-action-link">{{faculty.faculty_id}}</a></td>
+                    <td><a href="{% url 'masters:faculty_detail' faculty.id %}"
+                            class="faculty-action-link">{{faculty.faculty_id}}</a></td>
                     <td>{{ faculty.user.first_name }} {{ faculty.user.last_name }}</td>
                     <td>{{ faculty.dept.dept_name }} ({{ faculty.dept.dept_code }})</td>
                     <td>{{ faculty.phone_number }}</td>
                     <td>{{ faculty.user.email }}</td>
                     <td>
-                        <a href="{% url 'masters:faculty_detail' faculty.id %}" class="faculty-action-link"><img src="https://img.icons8.com/?size=100&id=fdX9cvS8MtuS&format=png&color=000000" alt="View" title="View details"></a>
-                        <a href="{% url 'masters:faculty_edit' faculty.id %}" class="faculty-action-link"><img src="https://img.icons8.com/?size=100&id=kzmsQM0bM3Bl&format=png&color=000000" alt="Edit" title="Edit Details"></a>
-                        <button class="faculty-delete-btn"
-                            data-faculty-id="{{ faculty.id }}"
+                        <a href="{% url 'masters:faculty_detail' faculty.id %}" class="faculty-action-link"><img
+                                src="https://img.icons8.com/?size=100&id=fdX9cvS8MtuS&format=png&color=000000"
+                                alt="View" title="View details"></a>
+                        <a href="{% url 'masters:faculty_edit' faculty.id %}" class="faculty-action-link"><img
+                                src="https://img.icons8.com/?size=100&id=kzmsQM0bM3Bl&format=png&color=000000"
+                                alt="Edit" title="Edit Details"></a>
+                        <button class="faculty-delete-btn btn-icon-link" data-faculty-id="{{ faculty.id }}"
                             data-faculty-name="{{ faculty.user.first_name }} {{ faculty.user.last_name }}"
                             data-faculty-email="{{ faculty.user.email }}"
                             data-faculty-dept="{{ faculty.dept.dept_name }}"
                             data-faculty-phone="{{ faculty.phone_number }}"
                             data-faculty-designation="{{ faculty.designation }}"
-                            data-faculty-status="{{ faculty.status }}"
-                            style="background:none;border:none;padding:0;cursor:pointer;">
-                            <img src="https://img.icons8.com/?size=100&id=99971&format=png&color=000000" alt="Delete" title="Delete Faculty">
+                            data-faculty-status="{{ faculty.status }}">
+                            <img src="https://img.icons8.com/?size=100&id=99971&format=png&color=000000" alt="Delete"
+                                title="Delete Faculty">
                         </button>
                     </td>
                 </tr>
@@ -131,8 +144,8 @@
 
 
 <!-- Faculty Delete Modal using AJAX -->
-<div id="facultyDeleteModal" class="modal" style="display:none;align-items:center;justify-content:center;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(30,58,95,0.18);z-index:1000;">
-    <div class="modal-content" id="facultyDeleteModalContent" style="background:transparent;padding:0;border-radius:14px;max-width:480px;width:100%;box-shadow:none;position:relative;">
+<div id="facultyDeleteModal" class="modal faculty-modal-backdrop">
+    <div class="modal-content faculty-modal-content-wrapper" id="facultyDeleteModalContent">
         <!-- Content will be loaded here -->
     </div>
 </div>
@@ -140,50 +153,50 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="{% static 'js/scripts.js' %}"></script>
 <script>
-const facultyFilterForm = document.getElementById('facultyFilterForm');
-const facultySearchInput = document.getElementById('search');
-const facultyDepartmentSelect = document.getElementById('department');
-const facultyList = document.getElementById('faculty-list');
-const facultyPaginationBar = document.querySelector('.pagination-bar');
-const resetFacultyBtn = document.getElementById('resetFacultyFilters');
+    const facultyFilterForm = document.getElementById('facultyFilterForm');
+    const facultySearchInput = document.getElementById('search');
+    const facultyDepartmentSelect = document.getElementById('department');
+    const facultyList = document.getElementById('faculty-list');
+    const facultyPaginationBar = document.querySelector('.pagination-bar');
+    const resetFacultyBtn = document.getElementById('resetFacultyFilters');
 
-let facultyAjaxTimeout = null;
-function fetchFacultyData(page = 1) {
-    const search = facultySearchInput.value;
-    const department = facultyDepartmentSelect.value;
-    const params = new URLSearchParams({type: 'faculty', search, department, page});
-    fetch('/masters/ajax/?' + params.toString(), {headers: {'X-Requested-With': 'XMLHttpRequest'}})
-        .then(r => r.json())
-        .then(data => {
-            facultyList.innerHTML = data.table_html;
-            facultyPaginationBar.innerHTML = data.pagination_html;
-            attachFacultyPaginationEvents();
+    let facultyAjaxTimeout = null;
+    function fetchFacultyData(page = 1) {
+        const search = facultySearchInput.value;
+        const department = facultyDepartmentSelect.value;
+        const params = new URLSearchParams({ type: 'faculty', search, department, page });
+        fetch('/masters/ajax/?' + params.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(r => r.json())
+            .then(data => {
+                facultyList.innerHTML = data.table_html;
+                facultyPaginationBar.innerHTML = data.pagination_html;
+                attachFacultyPaginationEvents();
+            });
+    }
+
+    function instantFacultyFilter() {
+        clearTimeout(facultyAjaxTimeout);
+        facultyAjaxTimeout = setTimeout(() => fetchFacultyData(1), 250);
+    }
+
+    facultySearchInput.addEventListener('input', instantFacultyFilter);
+    facultyDepartmentSelect.addEventListener('change', instantFacultyFilter);
+
+    function attachFacultyPaginationEvents() {
+        facultyPaginationBar.querySelectorAll('a[data-page]').forEach(a => {
+            a.addEventListener('click', function (e) {
+                e.preventDefault();
+                const page = this.getAttribute('data-page');
+                fetchFacultyData(page);
+            });
         });
-}
+    }
+    attachFacultyPaginationEvents();
 
-function instantFacultyFilter() {
-    clearTimeout(facultyAjaxTimeout);
-    facultyAjaxTimeout = setTimeout(() => fetchFacultyData(1), 250);
-}
-
-facultySearchInput.addEventListener('input', instantFacultyFilter);
-facultyDepartmentSelect.addEventListener('change', instantFacultyFilter);
-
-function attachFacultyPaginationEvents() {
-    facultyPaginationBar.querySelectorAll('a[data-page]').forEach(a => {
-        a.addEventListener('click', function(e) {
-            e.preventDefault();
-            const page = this.getAttribute('data-page');
-            fetchFacultyData(page);
-        });
+    resetFacultyBtn.addEventListener('click', function () {
+        facultySearchInput.value = '';
+        facultyDepartmentSelect.value = 'all';
+        fetchFacultyData(1);
     });
-}
-attachFacultyPaginationEvents();
-
-resetFacultyBtn.addEventListener('click', function() {
-    facultySearchInput.value = '';
-    facultyDepartmentSelect.value = 'all';
-    fetchFacultyData(1);
-});
 </script>
-{% endblock %}
+{% endblock %}

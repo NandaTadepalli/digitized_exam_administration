@@ -55,23 +55,39 @@ def ajax(request):
         page_obj = paginator.get_page(page_number)
         rows = []
         for idx, reg in enumerate(page_obj, start=page_obj.start_index()):
-            rows.append(f"""
-            <tr>
-                <td>{idx}</td>
-                <td>{escape(reg.student.student_id)}</td>
-                <td>{escape(getattr(reg.student, 'std_name', getattr(reg.student, 'user', None) and reg.student.user.get_full_name() or ''))}</td>
-                <td>{escape(reg.course.course_code)}</td>
-                <td>{escape(reg.course.course_name)}</td>
-                <td>{escape(reg.academic_year)}</td>
-                <td>{escape(reg.semester)}</td>
-                <td>
-                    <button class='edit-coursereg-btn' data-id='{reg.id}'>Edit</button>
-                    <button class='delete-coursereg-btn' data-id='{reg.id}'>Delete</button>
-                </td>
-            </tr>
-            """)
+            if hasattr(request.user, 'role') and request.user.role.lower() == 'admin':
+                rows.append(f"""
+                <tr>
+                    <td>{idx}</td>
+                    <td>{escape(reg.student.student_id)}</td>
+                    <td>{escape(getattr(reg.student, 'std_name', getattr(reg.student, 'user', None) and reg.student.user.get_full_name() or ''))}</td>
+                    <td>{escape(reg.course.course_code)}</td>
+                    <td>{escape(reg.course.course_name)}</td>
+                    <td>{escape(reg.academic_year)}</td>
+                    <td>{escape(reg.semester)}</td>
+                    <td>
+                        <button class='edit-coursereg-btn' data-id='{reg.id}'>Edit</button>
+                        <button class='delete-coursereg-btn' data-id='{reg.id}'>Delete</button>
+                    </td>
+                </tr>
+                """)
+            else:
+                rows.append(f"""
+                <tr>
+                    <td>{idx}</td>
+                    <td>{escape(reg.student.student_id)}</td>
+                    <td>{escape(getattr(reg.student, 'std_name', getattr(reg.student, 'user', None) and reg.student.user.get_full_name() or ''))}</td>
+                    <td>{escape(reg.course.course_code)}</td>
+                    <td>{escape(reg.course.course_name)}</td>
+                    <td>{escape(reg.academic_year)}</td>
+                    <td>{escape(reg.semester)}</td>
+                </tr>
+                """)
         if not rows:
-            rows.append("<tr><td colspan='8'>No course registrations found.</td></tr>")
+            if hasattr(request.user, 'role') and request.user.role.lower() == 'admin':
+                rows.append("<tr><td colspan='8'>No course registrations found.</td></tr>")
+            else:
+                rows.append("<tr><td colspan='7'>No course registrations found.</td></tr>")
         table_html = "".join(rows)
         pag = page_obj
         pagination_html = render_pagination(pag)
@@ -94,24 +110,40 @@ def ajax(request):
         page_obj = paginator.get_page(page_number)
         rows = []
         for idx, student in enumerate(page_obj, start=page_obj.start_index()):
-            rows.append(f"""
-            <tr>
-                <td>{idx}</td>
-                <td><a href='/masters/student/{student.id}/detail/' class='student-action-link'>{escape(student.student_id)}</a></td>
-                <td>{escape(student.user.first_name)} {escape(student.user.last_name)}</td>
-                <td>{escape(student.dept.dept_name)}({escape(student.dept.dept_code)})</td>
-                <td>{escape(student.batch.batch_code) if student.batch else '<span style="color:red">Not set</span>'}</td>
-                <td>{escape(student.email)}</td>
-                <td>{escape(student.status)}</td>
-                <td>
-                    <a href='/masters/student/{student.id}/detail/' class='student-action-link'><img src='https://img.icons8.com/?size=100&id=fdX9cvS8MtuS&format=png&color=000000' alt='View' title='View details'></a>
-                    <a href='/masters/student/{student.id}/edit/' class='student-action-link'><img src='https://img.icons8.com/?size=100&id=kzmsQM0bM3Bl&format=png&color=000000' alt='Edit' title='Edit Details'></a>
-                    <button class='student-delete-btn' data-student-id='{student.id}' data-student-name='{escape(student.user.first_name)} {escape(student.user.last_name)}' data-student-reg='{escape(student.student_id)}' data-student-email='{escape(student.email)}' data-student-dept='{escape(student.dept.dept_name)}' data-student-status='{escape(student.status)}' style='background:none;border:none;padding:0;cursor:pointer'><img src='https://img.icons8.com/?size=100&id=99971&format=png&color=000000' alt='Delete' title='Delete Student'></button>
-                </td>
-            </tr>
-            """)
+            if request.user.role == 'faculty':
+                rows.append(f"""
+                <tr>
+                    <td>{idx}</td>
+                    <td><a href='/masters/student/{student.id}/detail/' class='student-action-link'>{escape(student.student_id)}</a></td>
+                    <td>{escape(student.user.first_name)} {escape(student.user.last_name)}</td>
+                    <td>{escape(student.dept.dept_name)}({escape(student.dept.dept_code)})</td>
+                    <td>{escape(student.batch.batch_code) if student.batch else '<span style=\"color:red\">Not set</span>'}</td>
+                    <td>{escape(student.email)}</td>
+                    <td>{escape(student.status)}</td>
+                </tr>
+                """)
+            else:
+                rows.append(f"""
+                <tr>
+                    <td>{idx}</td>
+                    <td><a href='/masters/student/{student.id}/detail/' class='student-action-link'>{escape(student.student_id)}</a></td>
+                    <td>{escape(student.user.first_name)} {escape(student.user.last_name)}</td>
+                    <td>{escape(student.dept.dept_name)}({escape(student.dept.dept_code)})</td>
+                    <td>{escape(student.batch.batch_code) if student.batch else '<span style=\"color:red\">Not set</span>'}</td>
+                    <td>{escape(student.email)}</td>
+                    <td>{escape(student.status)}</td>
+                    <td>
+                        <a href='/masters/student/{student.id}/detail/' class='student-action-link'><img src='https://img.icons8.com/?size=100&id=fdX9cvS8MtuS&format=png&color=000000' alt='View' title='View details'></a>
+                        <a href='/masters/student/{student.id}/edit/' class='student-action-link'><img src='https://img.icons8.com/?size=100&id=kzmsQM0bM3Bl&format=png&color=000000' alt='Edit' title='Edit Details'></a>
+                        <button class='student-delete-btn' data-student-id='{student.id}' data-student-name='{escape(student.user.first_name)} {escape(student.user.last_name)}' data-student-reg='{escape(student.student_id)}' data-student-email='{escape(student.email)}' data-student-dept='{escape(student.dept.dept_name)}' data-student-status='{escape(student.status)}' style='background:none;border:none;padding:0;cursor:pointer'><img src='https://img.icons8.com/?size=100&id=99971&format=png&color=000000' alt='Delete' title='Delete Student'></button>
+                    </td>
+                </tr>
+                """)
         if not rows:
-            rows.append("<tr><td colspan='7'>No students found.</td></tr>")
+            if request.user.role == 'faculty':
+                rows.append("<tr><td colspan='7'>No students found.</td></tr>")
+            else:
+                rows.append("<tr><td colspan='8'>No students found.</td></tr>")
         table_html = "".join(rows)
         pag = page_obj
         pagination_html = render_pagination(pag)
@@ -178,9 +210,9 @@ def ajax(request):
                 <td>{escape(room.capacity)}</td>
                 <td>{'Active' if room.is_active else 'Temporarily Unavailable'}</td>
                 <td>
-                    <a href='/masters/room/{room.id}/detail/' class='room-action-link'><img src='https://img.icons8.com/?size=100&id=fdX9cvS8MtuS&format=png&color=000000' alt='View' title='View details'></a>
-                    <a href='/masters/room/{room.id}/edit/' class='room-action-link'><img src='https://img.icons8.com/?size=100&id=kzmsQM0bM3Bl&format=png&color=000000' alt='Edit' title='Edit Details'></a>
-                    <a href='/masters/room/{room.id}/delete/' class='room-action-link'><img src='https://img.icons8.com/?size=100&id=99971&format=png&color=000000' alt='Delete' title='Delete Room'></a>
+                    <a href='/masters/rooms/{room.id}/detail/' class='room-action-link'><img src='https://img.icons8.com/?size=100&id=fdX9cvS8MtuS&format=png&color=000000' alt='View' title='View details'></a>
+                    <a href='/masters/rooms/{room.id}/edit/' class='room-action-link'><img src='https://img.icons8.com/?size=100&id=kzmsQM0bM3Bl&format=png&color=000000' alt='Edit' title='Edit Details'></a>
+                    <a href='/masters/rooms/{room.id}/delete/' class='room-action-link'><img src='https://img.icons8.com/?size=100&id=99971&format=png&color=000000' alt='Delete' title='Delete Room'></a>
                 </td>
             </tr>
             """)

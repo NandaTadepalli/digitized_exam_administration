@@ -1,10 +1,10 @@
-{% extends "core/base_admin.html" %}
+{% extends base_template %}
 {% load static %}
 {% block content %}
     <div class="pages-main">
         <div class="view-page">
             <h1 class="pages-main-head">{{ faculty.faculty_id }} - {{ faculty.user.first_name }} {{ faculty.user.last_name }}</h1>
-            <p style="color:red;"><strong>Note:</strong> This page displays the details of the selected faculty.</p>
+            <p class="text-red"><strong>Note:</strong> This page displays the details of the selected faculty.</p>
             <h2>Faculty Details</h2>
             <div class="view-actions">
                 <table class="details-table">
@@ -25,7 +25,7 @@
                     </tbody>
                 </table>
             </div>
-            <a href="{% url 'masters:faculty' %}" class="action-link faculty-action-link">Back</a>
+            <a href="javascript:history.back()" class="action-link faculty-action-link">Back</a>
         </div>
     </div>
 {% endblock %}

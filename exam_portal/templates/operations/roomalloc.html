@@ -1,43 +1,46 @@
 {% extends "core/base_admin.html" %}
 {% load static %}
 {% block content %}
-    <div class="pages-main">
-        <h1 class="pages-main-head">Room Allocation</h1>
-        <div style="overflow-y: auto; border-radius: 8px; box-shadow: 0 1px 4px #e0e0e0;">
-            <table class="styled-table" style="min-width: 900px;">
-                <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                    <tr>
-                        <th>#</th>
-                        <th>Exam Name</th>
-                        <th>Academic Year</th>
-                        <th>Semester</th>
-                        <th>Start Date</th>
-                        <th>End Date</th>
-                        <th>Total Slots</th>
-                        <th>Slots Generated</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for exam in exams %}
-                    <tr>
-                        <td>{{ forloop.counter }}</td>
-                        <td>{{ exam.exam_name }}</td>
-                        <td>{{ exam.academic_year }}</td>
-                        <td>{{ exam.semester }}</td>
-                        <td>{{ exam.start_date }}</td>
-                        <td>{{ exam.end_date }}</td>
-                        <td>{{ exam.total_slots }}</td>
-                        <td>{{ exam.generated_slots }}</td>
-                        <td>
-                            <a href="{% url 'operations:room_alloc_view' %}?exam_id={{ exam.id }}" class="btn btn-primary">View Allocations</a>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr><td colspan="9">No exams found.</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+<div class="pages-main">
+    <h1 class="pages-main-head">Room Allocation</h1>
+    <div class="table-container-shadow">
+        <table class="styled-table min-w-900">
+            <thead class="sticky-header-f8">
+                <tr>
+                    <th>#</th>
+                    <th>Exam Name</th>
+                    <th>Academic Year</th>
+                    <th>Semester</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
+                    <th>Total Slots</th>
+                    <th>Slots Generated</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for exam in exams %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ exam.exam_name }}</td>
+                    <td>{{ exam.academic_year }}</td>
+                    <td>{{ exam.semester }}</td>
+                    <td>{{ exam.start_date }}</td>
+                    <td>{{ exam.end_date }}</td>
+                    <td>{{ exam.total_slots }}</td>
+                    <td>{{ exam.generated_slots }}</td>
+                    <td>
+                        <a href="{% url 'operations:room_alloc_view' %}?exam_id={{ exam.id }}"
+                            class="btn btn-primary">View Allocations</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" class="text-center">No exams found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
+</div>
 {% endblock %}

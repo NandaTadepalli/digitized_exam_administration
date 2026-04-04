@@ -2,62 +2,226 @@
 {% block content %}
 <div class="pages-main">
     <h1 class="pages-main-head">Room Allocation Details</h1>
-    <div class="controls-1" style="display: flex; flex-wrap: wrap; gap: 20px; background: #f8fafc; border-radius: 12px;margin-bottom: 5px;">
-        <div class="readonly-field" style="min-width: 220px;"><label>Exam Name:</label> <span>{{ exam.exam_name }}</span></div>
-        <div class="readonly-field" style="min-width: 220px;"><label>Academic Year:</label> <span>{{ exam.academic_year }}</span></div>
-        <div class="readonly-field" style="min-width: 220px;"><label>Semester:</label> <span>{{ exam.semester }}</span></div>
-        <div class="readonly-field" style="min-width: 220px;"><label>Start Date:</label> <span>{{ exam.start_date }}</span></div>
-        <div class="readonly-field" style="min-width: 220px;"><label>End Date:</label> <span>{{ exam.end_date }}</span></div>
-        <div class="readonly-field" style="min-width: 220px;"><label>Total Slots:</label> <span>{{ exam.total_slots }}</span></div>
-        <div class="readonly-field" style="min-width: 220px;"><label>Slots with Seating Generated:</label> <span>{{ exam.generated_slots }}</span></div>
+    <div class="controls-1 controls-flex-wrap mb-5">
+        <div class="readonly-field min-w-220"><label>Exam Name:</label> <span>{{ exam.exam_name}}</span>
+        </div>
+        <div class="readonly-field min-w-220"><label>Academic Year:</label>
+            <span>{{exam.academic_year}}</span>
+        </div>
+        <div class="readonly-field min-w-220"><label>Semester:</label> <span>{{ exam.semester}}</span>
+        </div>
+        <div class="readonly-field min-w-220"><label>Start Date:</label>
+            <span>{{exam.start_date}}</span>
+        </div>
+        <div class="readonly-field min-w-220"><label>End Date:</label> <span>{{ exam.end_date}}</span>
+        </div>
+        <div class="readonly-field min-w-220"><label>Total Slots:</label>
+            <span>{{exam.total_slots}}</span>
+        </div>
+        <div class="readonly-field min-w-220"><label>Slots with Seating Generated:</label>
+            <span>{{exam.generated_slots }}</span>
+        </div>
     </div>
-    <div style="height: calc(100vh - 250px); overflow-y: auto; border-radius: 8px; box-shadow: 0 1px 4px #e0e0e0;">
-        <table class="styled-table" style="min-width: 1200px;">
-            <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 2;">
-                <tr>
-                    <th>#</th>
-                    <th>Exam Type</th>
-                    <th>Mode</th>
-                    <th>Date</th>
-                    <th>Start Time</th>
-                    <th>End Time</th>
-                    <th>Slot Code</th>
-                    <th>Room Name</th>
-                    <th>Actual Cap</th>
-                    <th>Assigned Cap</th>
-                    <th>Invigilator IDs</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for row in slot_rows %}
-                <tr>
-                    <td>{{ forloop.counter }}</td>
-                    <td>{{ row.exam_type }}</td>
-                    <td>{{ row.mode }}</td>
-                    <td>{{ row.exam_date }}</td>
-                    <td>{{ row.start_time }}</td>
-                    <td>{{ row.end_time }}</td>
-                    <td>{{ row.slot_code }}</td>
-                    <td>{{ row.room_name }}</td>
-                    <td>{{ row.actual_cap }}</td>
-                    <td>{{ row.assigned_cap }}</td>
-                    <td>
-                        {% for id in row.invigilator_ids %}
-                            <span>{{ id }}</span>{% if not forloop.last %}, {% endif %}
+    <div class="slot-cards-container">
+        {% regroup slot_rows by slot_id as grouped_slots %}
+        {% for slot in grouped_slots %}
+        {% with first_row=slot.list.0 %}
+        <div class="slot-card" id="card_{{ slot.grouper }}">
+            <div class="slot-header" onclick="toggleCard('{{ slot.grouper }}')">
+                <div class="slot-info-grid">
+                    <div class="slot-info-item">
+                        <span class="slot-info-label">Slot Code</span>
+                        <span class="slot-info-value text-blue">{{ first_row.slot_code }}</span>
+                    </div>
+                    <div class="slot-info-item">
+                        <span class="slot-info-label">Exam Type</span>
+                        <span class="slot-info-value">{{ first_row.exam_type }}</span>
+                    </div>
+                    <div class="slot-info-item">
+                        <span class="slot-info-label">Mode</span>
+                        <span class="slot-info-value">{{ first_row.mode }}</span>
+                    </div>
+                    <div class="slot-info-item">
+                        <span class="slot-info-label">Date</span>
+                        <span class="slot-info-value">{{ first_row.exam_date }}</span>
+                    </div>
+                    <div class="slot-info-item">
+                        <span class="slot-info-label">Time</span>
+                        <span class="slot-info-value">{{ first_row.start_time }} - {{ first_row.end_time }}</span>
+                    </div>
+                    <div class="slot-info-item">
+                        <span class="slot-info-label">Total Students</span>
+                        <span class="slot-info-value">{{ first_row.slot_total_students }}</span>
+                    </div>
+                    <div class="slot-info-item">
+                        <span class="slot-info-label">Assigned</span>
+                        <span class="slot-info-value text-green">
+                            {{first_row.slot_assigned_students}}</span>
+                    </div>
+                </div>
+                <div class="dropdown-icon">
+                    ▼
+                </div>
+            </div>
+            <div class="slot-body">
+                <div class="slot-actions">
+                    <button class="action-btn btn-print-all"
+                        onclick="printAllRooms(this, '{{ slot.grouper }}', '[{% for row in slot.list %}&quot;{{ row.room_id }}&quot;{% if not forloop.last %},{% endif %}{% endfor %}]')">
+                        <img src="https://img.icons8.com/ios-filled/50/ffffff/print.png" alt="Print Icon">
+                        Print All Seating Plans ({{ slot.list|length }})
+                    </button>
+                </div>
+                <table class="room-table">
+                    <thead>
+                        <tr>
+                            <th>Room Name</th>
+                            <th>Actual Cap</th>
+                            <th>Assigned Cap</th>
+                            <th>Invigilators</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in slot.list %}
+                        <tr>
+                            <td><strong>{{ row.room_name }}</strong></td>
+                            <td>{{ row.actual_cap }}</td>
+                            <td>{{ row.assigned_cap }}</td>
+                            <td>
+                                {% for id in row.invigilator_ids %}
+                                <span class="invigilator-badge">
+                                    {{id }}</span>
+                                {% empty %}
+                                <span class="no-invigilator">None</span>
+                                {% endfor %}
+                            </td>
+                            <td>
+                                <a href="{% url 'operations:seatingplan' %}?slot_id={{ row.slot_id }}&room_id={{ row.room_id }}"
+                                    class="action-btn btn-view">View</a>
+                                <a href="#"
+                                    onclick="silentPrint(this, '{{ row.slot_id }}', '{{ row.room_id }}'); return false;"
+                                    class="action-btn btn-print">Print</a>
+                            </td>
+                        </tr>
                         {% endfor %}
-                    </td>
-                    <td>
-                        <a href="{% url 'operations:seatingplan' %}?slot_id={{ row.slot_id }}&room_id={{ row.room_id }}" class="btn btn-primary">View</a>
-                        <a href="#" class="btn btn-secondary">Print</a>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="12">No room allocations found.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endwith %}
+        {% empty %}
+        <div class="no-alloc-box">
+            No room allocations found.
+        </div>
+        {% endfor %}
     </div>
+
+    <script>
+        function toggleCard(grouperId) {
+            var card = document.getElementById('card_' + grouperId);
+            card.classList.toggle('expanded');
+        }
+
+        function silentPrint(btn, slotId, roomId) {
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span class="loading-text-sm">Loading...</span>';
+            btn.classList.add('opacity-0-7', 'no-pointer');
+
+            const baseUrl = "{% url 'operations:seatingplan' %}";
+            const url = baseUrl + "?slot_id=" + slotId + "&room_id=" + roomId;
+
+            fetch(url)
+                .then(response => response.text())
+                .then(html => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, "text/html");
+                    const content = doc.querySelector('.pages-main');
+
+                    if (content) {
+                        let printDiv = document.getElementById('printable-content');
+                        if (!printDiv) {
+                            printDiv = document.createElement('div');
+                            printDiv.id = 'printable-content';
+                            document.body.appendChild(printDiv);
+                        }
+                        printDiv.innerHTML = content.innerHTML;
+
+                        setTimeout(() => {
+                            document.body.classList.add('printing-silent');
+                            window.print();
+                            document.body.classList.remove('printing-silent');
+                            setTimeout(() => { printDiv.innerHTML = ''; }, 1000);
+                        }, 500);
+                    } else {
+                        throw new Error('Content not found');
+                    }
+                })
+                .catch(err => {
+                    console.error('Print Error:', err);
+                    window.location.href = url + "&print=1";
+                })
+                .finally(() => {
+                    btn.innerHTML = originalText;
+                    btn.classList.remove('opacity-0-7', 'no-pointer');
+                });
+        }
+
+        async function printAllRooms(btn, slotId, roomIdsJson) {
+            const roomIds = JSON.parse(roomIdsJson.replace(/&quot;/g, '"'));
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span class="loading-text-md">Gathering ' + roomIds.length + ' Rooms...</span>';
+            btn.classList.add('opacity-0-7', 'no-pointer');
+
+            const baseUrl = "{% url 'operations:seatingplan' %}";
+            let combinedHtml = '';
+
+            try {
+                // Fetch all seating plans in parallel for performance
+                const promises = roomIds.map(roomId =>
+                    fetch(baseUrl + "?slot_id=" + slotId + "&room_id=" + roomId).then(r => r.text())
+                );
+
+                const results = await Promise.all(promises);
+                const parser = new DOMParser();
+
+                results.forEach((html, index) => {
+                    const doc = parser.parseFromString(html, "text/html");
+                    const content = doc.querySelector('.pages-main');
+                    if (content) {
+                        // Wrap each room plan in a div that handles page breaks
+                        combinedHtml += '<div class="print-page-break">' + content.innerHTML + '</div>';
+                    }
+                });
+
+                if (combinedHtml) {
+                    let printDiv = document.getElementById('printable-content');
+                    if (!printDiv) {
+                        printDiv = document.createElement('div');
+                        printDiv.id = 'printable-content';
+                        document.body.appendChild(printDiv);
+                    }
+
+                    printDiv.innerHTML = combinedHtml;
+
+                    // Allow time for the dynamic content to be seen by the page/styles
+                    setTimeout(() => {
+                        document.body.classList.add('printing-silent');
+                        window.print();
+                        document.body.classList.remove('printing-silent');
+                        setTimeout(() => { printDiv.innerHTML = ''; }, 1000);
+                    }, 800);
+                } else {
+                    alert("No printable content found for this slot.");
+                }
+            } catch (err) {
+                console.error('Bulk Print Error:', err);
+                alert("An error occurred while preparing the bulk print job.");
+            } finally {
+                btn.innerHTML = originalText;
+                btn.classList.remove('opacity-0-7', 'no-pointer');
+            }
+        }
+    </script>
 </div>
-<!-- Remove Seating Plan Popup and JS -->
+{% endblock %}
 {% endblock %}

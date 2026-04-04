@@ -3,37 +3,44 @@
 {% block content %}
 <div class="pages-main">
 	<h1 class="pages-main-head">Room Allocation Details</h1>
-	<div class="note-text">
-		<p style="color: #2C4C70;">Room allocation details for selected exam slot.</p>
-	</div>
-	<div class="controls-1" style="display: flex; flex-wrap: wrap; gap: 20px; background: #f8fafc; border-radius: 12px;margin-bottom: 10px;">
-		<div class="readonly-field" style="min-width: 220px;"><label>Exam Name:</label> <span>{{ slot.examination.exam_name }}</span></div>
-		<div class="readonly-field" style="min-width: 220px;"><label>Exam Type:</label> <span>{{ slot.exam_type }}</span></div>
-		<div class="readonly-field" style="min-width: 220px;"><label>Mode:</label> <span>{{ slot.mode }}</span></div>
-		<div class="readonly-field" style="min-width: 220px;"><label>Exam Date:</label> <span>{{ slot.exam_date }}</span></div>
-		<div class="readonly-field" style="min-width: 220px;"><label>Start Time:</label> <span>{{ slot.start_time }}</span></div>
-		<div class="readonly-field" style="min-width: 220px;"><label>End Time:</label> <span>{{ slot.end_time }}</span></div>
-		<div class="readonly-field" style="min-width: 220px;"><label>Slot Code:</label> <span>{{ slot.slot_code }}</span></div>
-		<div class="readonly-field" style="min-width: 220px;"><label>Academic Year:</label> <span>{{ slot.examination.academic_year }}</span></div>
-		<div class="readonly-field" style="min-width: 220px;"><label>Semester:</label> <span>{{ slot.examination.semester }}</span></div>
+	<div class="controls-1 controls-flex-wrap mb-10">
+		<div class="readonly-field min-w-220"><label>Exam Name:</label> <span>{{
+				slot.examination.exam_name }}</span></div>
+		<div class="readonly-field min-w-220"><label>Exam Type:</label> <span>{{ slot.exam_type
+				}}</span></div>
+		<div class="readonly-field min-w-220"><label>Mode:</label> <span>{{ slot.mode }}</span></div>
+		<div class="readonly-field min-w-220"><label>Exam Date:</label> <span>{{ slot.exam_date
+				}}</span></div>
+		<div class="readonly-field min-w-220"><label>Start Time:</label> <span>{{ slot.start_time
+				}}</span></div>
+		<div class="readonly-field min-w-220"><label>End Time:</label> <span>{{ slot.end_time }}</span>
+		</div>
+		<div class="readonly-field min-w-220"><label>Slot Code:</label> <span>{{ slot.slot_code
+				}}</span></div>
+		<div class="readonly-field min-w-220"><label>Academic Year:</label> <span>{{
+				slot.examination.academic_year }}</span></div>
+		<div class="readonly-field min-w-220"><label>Semester:</label> <span>{{
+				slot.examination.semester }}</span></div>
 	</div>
 	<div class="room-capacity-summary-wrapper">
 		<span class="room-capacity-summary-item room-capacity-summary-flex">
-			<span class="room-capacity-summary-label">Total Required Capacity:</span>
-			<span id="required-capacity-display" class="room-capacity-summary-value required">{{ required_capacity }}</span>
+			<span class="room-capacity-summary-label">Required Rooms | Capacity:</span>
+			<span id="required-room-display" class="room-capacity-summary-value required">{{ required_room_count }} | {{
+				required_capacity }}</span>
 		</span>
 		<span class="room-capacity-summary-item room-capacity-summary-flex">
-			<span class="room-capacity-summary-label">Allocated Capacity:</span>
-			<span id="allocated-capacity-display" class="room-capacity-summary-value selected">0</span>
+			<span class="room-capacity-summary-label">Allocated Rooms | Capacity:</span>
+			<span id="allocated-room-display" class="room-capacity-summary-value selected">{{ allocated_room_count }} |
+				{{ allocated_room_capacity }}</span>
 		</span>
 	</div>
 	<div class="rooms-table-section">
 		<h3>Available Rooms</h3>
 		<form method="post" action="">
 			{% csrf_token %}
-			<div style="max-height: 375px; overflow-y: auto;">
-				<table class="table" style="min-width:600px; margin-top: 0px;">
-					<thead style="position:sticky; top:0; background:#f8fafc; z-index:2;">
+			<div class="table-scroll-375">
+				<table class="table min-w-600 mt-0">
+					<thead class="sticky-header-f8">
 						<tr>
 							<th>Select</th>
 							<th>Room Code</th>
@@ -45,20 +52,25 @@
 					<tbody>
 						{% for room in rooms %}
 						<tr>
-							<td><input type="checkbox" name="selected_rooms" value="{{ room.id }}" data-capacity="{{ room.capacity }}" {% if room.id in allocated_room_ids %}checked{% endif %}></td>
+							<td><input type="checkbox" name="selected_rooms" value="{{ room.id }}"
+									data-capacity="{{ room.capacity }}" {% if room.id in allocated_room_ids %}checked{%
+									endif %}></td>
 							<td>{{ room.room_code }}</td>
 							<td>{{ room.room_type }}</td>
 							<td>{{ room.block }}</td>
 							<td>{{ room.capacity }}</td>
 						</tr>
 						{% empty %}
-						<tr><td colspan="5" style="text-align:center;">No rooms available.</td></tr>
+						<tr>
+							<td colspan="5" class="text-center">No rooms available.</td>
+						</tr>
 						{% endfor %}
 					</tbody>
 				</table>
 			</div>
 			<button type="submit" class="control-btn">Allocate Selected Rooms</button>
-			<button type="button" class="control-btn" id="clear-room-selection" style="margin-left:10px;">Clear All</button>
+			<button type="button" class="control-btn ml-10" id="clear-room-selection">Clear
+				All</button>
 		</form>
 	</div>
-{% endblock %}
+	{% endblock %}

@@ -684,8 +684,12 @@ def student_exams(request):
     for smap in exam_maps:
         exam = smap.exam
         slot = exam.exam_slot if exam else None
-        exam_name = slot.examination.exam_name if slot and slot.examination else ''
-        exam_date = slot.examination.start_date if slot and slot.examination else ''
+        examination = slot.examination if slot and slot.examination else None
+        # Only show exams if the parent examination is published
+        if not examination or not getattr(examination, 'published', False):
+            continue
+        exam_name = examination.exam_name if examination else ''
+        exam_date = examination.start_date if examination else ''
         start_time = slot.start_time if slot else ''
         end_time = slot.end_time if slot else ''
         duration = ''

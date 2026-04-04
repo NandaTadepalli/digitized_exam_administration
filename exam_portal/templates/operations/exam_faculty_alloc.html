@@ -1,87 +1,101 @@
 {% extends "core/base_admin.html" %}
 {% load static %}
 {% if messages %}
-	{% for message in messages %}
-		{% if message.tags != 'info' or message != 'No changes made to faculty allocation.' %}
-			<div style="color: green; margin-bottom: 10px;">{{ message }}</div>
-		{% endif %}
-	{% endfor %}
+{% for message in messages %}
+{% if message.tags != 'info' or message != 'No changes made to faculty allocation.' %}
+<div class="msg-green">{{ message }}</div>
+{% endif %}
+{% endfor %}
 {% endif %}
 {% if allocated_faculty_objs %}
-	<div style="margin-bottom: 10px;">
-		<strong>Currently Allocated Faculty for this Slot:</strong>
-		<ul>
-		{% for fac in allocated_faculty_objs %}
-			<li>{{ fac.faculty_name }} ({{ fac.faculty_id }}){% if fac.dept %} - {{ fac.dept.dept_name }}{% endif %}</li>
-		{% endfor %}
-		</ul>
-	</div>
+<div class="mb-10">
+    <strong>Currently Allocated Faculty for this Slot:</strong>
+    <ul>
+        {% for fac in allocated_faculty_objs %}
+        <li>{{ fac.faculty_name }} ({{ fac.faculty_id }}){% if fac.dept %} - {{ fac.dept.dept_name }}{% endif %}</li>
+        {% endfor %}
+    </ul>
+</div>
 {% endif %}
 {% block content %}
 <div class="pages-main">
-	<h1 class="pages-main-head">Faculty Assignment Details</h1>
-	<div class="note-text">
-		<p style="color: #2C4C70;">Faculty assignment details for selected exam slot.</p>
-	</div>
-	<div class="controls-1" style="display: flex; flex-wrap: wrap; gap: 20px; background: #f8fafc; border-radius: 12px;margin-bottom: 5px;">
-		<div class="readonly-field" style="min-width: 220px;"><label>Exam Name:</label> <span>{{ slot.examination.exam_name }}</span></div>
-		<div class="readonly-field" style="min-width: 220px;"><label>Exam Type:</label> <span>{{ slot.exam_type }}</span></div>
-		<div class="readonly-field" style="min-width: 220px;"><label>Mode:</label> <span>{{ slot.mode }}</span></div>
-		<div class="readonly-field" style="min-width: 220px;"><label>Exam Date:</label> <span>{{ slot.exam_date }}</span></div>
-		<div class="readonly-field" style="min-width: 220px;"><label>Start Time:</label> <span>{{ slot.start_time }}</span></div>
-		<div class="readonly-field" style="min-width: 220px;"><label>End Time:</label> <span>{{ slot.end_time }}</span></div>
-		<div class="readonly-field" style="min-width: 220px;"><label>Slot Code:</label> <span>{{ slot.slot_code }}</span></div>
-		<div class="readonly-field" style="min-width: 220px;"><label>Academic Year:</label> <span>{{ slot.examination.academic_year }}</span></div>
-		<div class="readonly-field" style="min-width: 220px;"><label>Semester:</label> <span>{{ slot.examination.semester }}</span></div>
-	</div>
-	<div class="faculty-capacity-summary-wrapper">
-		<span class="faculty-capacity-summary-item faculty-capacity-summary-flex">
-			<span class="faculty-capacity-summary-label">Total Required Faculty:</span>
-			<span id="required-faculty-display" class="faculty-capacity-summary-value required">{{ required_faculty }}</span>
-		</span>
-		<span class="faculty-capacity-summary-item faculty-capacity-summary-flex">
-			<span class="faculty-capacity-summary-label">Allocated Faculty:</span>
-			<span id="allocated-faculty-display" class="faculty-capacity-summary-value selected">{{ allocated_faculty }}</span>
-		</span>
-	</div>
-	<div class="faculty-assigned">
-		<h3>Faculty Assigned</h3>
- 
-		<form method="post" action="">
-			<input type="hidden" name="slot_id" value="{{ slot.id }}">
-			{% csrf_token %}
-			<div style="max-height: 375px; overflow-y: auto;">
-				<table class="table" style="min-width:600px; margin-top: 0px;">
-					<thead style="position:sticky; top:0; background:#f8fafc; z-index:2;">
-						<tr>
-							<th>Select</th>
-							<th>Faculty ID</th>
-							<th>Faculty Name</th>
-							<th>Department</th>
-							<th>Role</th>
-						</tr>
-					</thead>
-					<tbody>
-						{% for faculty in faculties %}
-						<tr>
-							<td><input type="checkbox" name="selected_faculty" value="{{ faculty.id }}" {% if faculty.id in allocated_faculty_ids %}checked{% endif %}></td>
-							<td>{{ faculty.id }}</td>
-							<td>{{ faculty.name }}</td>
-							<td>{{ faculty.department }}</td>
-							<td>{{ faculty.role }}</td>
-						</tr>
-						{% empty %}
-						<tr><td colspan="5" style="text-align:center;">No faculty assigned.</td></tr>
-						{% endfor %}
-					</tbody>
-				</table>
-			</div>
-			<div style="margin-top:10px;">
-				<button type="submit" class="control-btn" name="assign_faculty">Assign Selected Faculty</button>
-				<button type="button" class="control-btn" id="clear-faculty-selection" style="margin-left:10px;">Clear All</button>
-			</div>
-		</form>
-	</div>
+    <h1 class="pages-main-head">Faculty Assignment Details</h1>
+    <div class="note-text">
+        <p class="note-navy">Faculty assignment details for selected exam slot.</p>
+    </div>
+    <div class="controls-1 controls-flex-wrap">
+        <div class="readonly-field min-w-220"><label>Exam Name:</label> <span>{{
+                slot.examination.exam_name }}</span></div>
+        <div class="readonly-field min-w-220"><label>Exam Type:</label> <span>{{ slot.exam_type
+                }}</span></div>
+        <div class="readonly-field min-w-220"><label>Mode:</label> <span>{{ slot.mode }}</span></div>
+        <div class="readonly-field min-w-220"><label>Exam Date:</label> <span>{{ slot.exam_date
+                }}</span></div>
+        <div class="readonly-field min-w-220"><label>Start Time:</label> <span>{{ slot.start_time
+                }}</span></div>
+        <div class="readonly-field min-w-220"><label>End Time:</label> <span>{{ slot.end_time }}</span>
+        </div>
+        <div class="readonly-field min-w-220"><label>Slot Code:</label> <span>{{ slot.slot_code
+                }}</span></div>
+        <div class="readonly-field min-w-220"><label>Academic Year:</label> <span>{{
+                slot.examination.academic_year }}</span></div>
+        <div class="readonly-field min-w-220"><label>Semester:</label> <span>{{
+                slot.examination.semester }}</span></div>
+    </div>
+    <div class="faculty-capacity-summary-wrapper">
+        <span class="faculty-capacity-summary-item faculty-capacity-summary-flex">
+            <span class="faculty-capacity-summary-label">Total Required Faculty:</span>
+            <span id="required-faculty-display" class="faculty-capacity-summary-value required">{{ required_faculty
+                }}</span>
+        </span>
+        <span class="faculty-capacity-summary-item faculty-capacity-summary-flex">
+            <span class="faculty-capacity-summary-label">Allocated Faculty:</span>
+            <span id="allocated-faculty-display" class="faculty-capacity-summary-value selected">{{ allocated_faculty
+                }}</span>
+        </span>
+    </div>
+    <div class="faculty-assigned">
+        <h3>Faculty Assigned</h3>
+
+        <form method="post" action="">
+            <input type="hidden" name="slot_id" value="{{ slot.id }}">
+            {% csrf_token %}
+            <div class="table-scroll-375">
+                <table class="table min-w-600 mt-0">
+                    <thead class="sticky-header-f8">
+                        <tr>
+                            <th>Select</th>
+                            <th>Faculty ID</th>
+                            <th>Faculty Name</th>
+                            <th>Department</th>
+                            <th>Role</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for faculty in faculties %}
+                        <tr>
+                            <td><input type="checkbox" name="selected_faculty" value="{{ faculty.id }}" {% if faculty.id
+                                    in allocated_faculty_ids %}checked{% endif %}></td>
+                            <td>{{ faculty.id }}</td>
+                            <td>{{ faculty.name }}</td>
+                            <td>{{ faculty.department }}</td>
+                            <td>{{ faculty.role }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center">No faculty assigned.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="mt-10">
+                <button type="submit" class="control-btn" name="assign_faculty">Assign Selected Faculty</button>
+                <button type="button" class="control-btn ml-10" id="clear-faculty-selection">Clear
+                    All</button>
+            </div>
+        </form>
+    </div>
 </div>
 {% endblock %}
 

@@ -16,6 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from masters.views import faculty_dashboard, invigilation_duties
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -23,4 +24,6 @@ urlpatterns = [
     path("accounts/", include("accounts.urls")),
     path("masters/", include("masters.urls")),
     path("ops/", include("operations.urls")),
+    path("faculty/dashboard/", faculty_dashboard, name="faculty_dashboard_direct"),
+    path("faculty/invigilation_duties/", invigilation_duties, name="invigilation_duties_direct"),
 ]

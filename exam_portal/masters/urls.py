@@ -8,6 +8,11 @@ urlpatterns = [
     # BATCH
     path("batch/upload/", views.batch_upload, name="batch_upload"),
     path("batch/", views.batch_list, name="batch_list"),
+    path("faculty/dashboard/", views.faculty_dashboard, name="faculty_dashboard"),
+
+    # Direct invigilation duties route
+    path("faculty/invigilation_duties/", views.invigilation_duties, name="invigilation_duties_direct"),
+
     # STUDENT
     path("student/", views.student, name="student"),
     path("student/content/", views.student_content, name="student_content"),
@@ -16,7 +21,7 @@ urlpatterns = [
     path("student/<int:pk>/delete/", views.student_delete, name="student_delete"),
     path("student/upload/", views.student_upload, name="student_upload"),
     path("student/update_conflicts/", views.student_update_conflicts, name="student_update_conflicts"),
-    
+
     # Central AJAX endpoint for all management pages
     path('ajax/', ajax.ajax, name='ajax'),
 
@@ -50,4 +55,8 @@ urlpatterns = [
     path("coursereg/", views.coursereg, name="coursereg"),
     path("coursereg/upload/", views.coursereg_upload, name="coursereg_upload"),
     path("coursereg/conflict/resolve/", views.coursereg_conflict_resolve, name="coursereg_conflict_resolve"),
+    path("faculty/invigilation_duties/", views.invigilation_duties, name="invigilation_duties"),
+
+    # FACULTY VIEW SEATING PLAN
+    path("faculty/view_seatingplan/", views.facultyview_seatingplan, name="facultyview_seatingplan"),
 ]

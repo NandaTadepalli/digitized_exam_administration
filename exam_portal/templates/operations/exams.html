@@ -1,114 +1,125 @@
 {% extends "core/base_admin.html" %}
 {% load static %}
 {% block content %}
-    <!-- Edit Slot Modal -->
-    <div id="editSlotModal" class="modal" style="display:none;position:fixed;z-index:1000;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.4);align-items:center;justify-content:center;">
-        <div class="modal-content" style="background:#fff;padding:2em;max-width:500px;border-radius:8px;position:relative;">
-            <span id="closeEditSlotModal" style="position:absolute;top:10px;right:16px;font-size:1.5em;cursor:pointer;">&times;</span>
-            <h2 style="margin-top:0;">Edit Exam Slot</h2>
-            <form id="editSlotForm">
-                {% csrf_token %}
-                <input type="hidden" id="editSlotId" name="slot_id">
-                <div style="margin-bottom:1em;">
-                    <label for="edit_examtype">Exam Type:</label>
-                    <select id="edit_examtype" name="examtype" required>
-                        <option value="Regular">Regular</option>
-                        <option value="Supplementary">Supplementary</option>
-                        <option value="Improvement">Improvement</option>
-                    </select>
-                </div>
-                <div style="margin-bottom:1em;">
-                    <label for="edit_mode">Mode:</label>
-                    <select id="edit_mode" name="mode" required>
-                        <option value="Theoretical">Theoretical</option>
-                        <option value="Practical">Practical</option>
-                        <option value="Viva">Viva</option>
-                        <option value="Quiz">Quiz</option>
-                        <option value="Assignment">Assignment</option>
-                    </select>
-                </div>
-                <div style="margin-bottom:1em;">
-                    <label for="edit_exam_date">Exam Date:</label>
-                    <br>
-                    <input type="date" id="edit_exam_date" name="exam_date" required>
-                </div>
-                <div style="margin-bottom:1em;">
-                    <label for="edit_start_time">Start Time:</label>
-                    <br>
-                    <input type="time" id="edit_start_time" name="start_time" required>
-                </div>
-                <div style="margin-bottom:1em;">
-                    <label for="edit_end_time">End Time:</label>
-                    <br>
-                    <input type="time" id="edit_end_time" name="end_time" required>
-                </div>
-                <div style="margin-bottom:1em;">
-                    <label for="edit_slot_code">Slot Code:</label>
-                    <select id="edit_slot_code" name="slot_code" required>
-                        <option value="AM">AM</option>
-                        <option value="PM">PM</option>
-                        <option value="FN">FN</option>
-                        <option value="AN">AN</option>
-                        <option value="EVENING">EVENING</option>
-                    </select>
-                </div>
-                <div style="margin-bottom:1em;">
-                    <a href="#" id="saveEditSlotBtn" class="action-link">Save</a>
-                    <a href="#" id="cancelEditSlotBtn" class="action-link">Cancel</a>
-                </div>
-            </form>
-        </div>
+<!-- Edit Slot Modal -->
+<div id="editSlotModal" class="modal modal-z-1000 modal-backdrop-black-4">
+    <div class="modal-content-base">
+        <span id="closeEditSlotModal" class="close-modal-x">&times;</span>
+        <h2 class="mt-0">Edit Exam Slot</h2>
+        <form id="editSlotForm">
+            {% csrf_token %}
+            <input type="hidden" id="editSlotId" name="slot_id">
+            <div class="mb-1em">
+                <label for="edit_examtype">Exam Type:</label>
+                <select id="edit_examtype" name="examtype" required>
+                    <option value="Regular">Regular</option>
+                    <option value="Supplementary">Supplementary</option>
+                    <option value="Improvement">Improvement</option>
+                </select>
+            </div>
+            <div class="mb-1em">
+                <label for="edit_mode">Mode:</label>
+                <select id="edit_mode" name="mode" required>
+                    <option value="Theoretical">Theoretical</option>
+                    <option value="Practical">Practical</option>
+                    <option value="Viva">Viva</option>
+                    <option value="Quiz">Quiz</option>
+                    <option value="Assignment">Assignment</option>
+                </select>
+            </div>
+            <div class="mb-1em">
+                <label for="edit_exam_date">Exam Date:</label>
+                <br>
+                <input type="date" id="edit_exam_date" name="exam_date" required>
+            </div>
+            <div class="mb-1em">
+                <label for="edit_start_time">Start Time:</label>
+                <br>
+                <input type="time" id="edit_start_time" name="start_time" required>
+            </div>
+            <div class="mb-1em">
+                <label for="edit_end_time">End Time:</label>
+                <br>
+                <input type="time" id="edit_end_time" name="end_time" required>
+            </div>
+            <div class="mb-1em">
+                <label for="edit_slot_code">Slot Code:</label>
+                <select id="edit_slot_code" name="slot_code" required>
+                    <option value="AM">AM</option>
+                    <option value="PM">PM</option>
+                    <option value="FN">FN</option>
+                    <option value="AN">AN</option>
+                    <option value="EVENING">EVENING</option>
+                </select>
+            </div>
+            <div class="mb-1em">
+                <a href="#" id="saveEditSlotBtn" class="action-link">Save</a>
+                <a href="#" id="cancelEditSlotBtn" class="action-link">Cancel</a>
+            </div>
+        </form>
     </div>
+</div>
 <div class="pages-main">
     <h1 class="pages-main-head">Exam Slot Management</h1>
     <div class="controls-1">
-        <form id="examSlotForm" action="{% url 'operations:exams' %}{% if request.GET.exam_id or request.GET.exam_name or request.GET.start_date or request.GET.end_date %}?{% if request.GET.exam_id %}exam_id={{ request.GET.exam_id }}&{% endif %}{% if request.GET.exam_name %}exam_name={{ request.GET.exam_name|urlencode }}&{% endif %}{% if request.GET.start_date %}start_date={{ request.GET.start_date }}&{% endif %}{% if request.GET.end_date %}end_date={{ request.GET.end_date }}{% endif %}{% endif %}" method="post" autocomplete="off">
-                {% csrf_token %}
-                <input type="hidden" name="start_date" value="{{ q_start_date }}">
-                <input type="hidden" name="end_date" value="{{ q_end_date }}">
+        <form id="examSlotForm"
+            action="{% url 'operations:exams' %}{% if request.GET.exam_id or request.GET.exam_name or request.GET.start_date or request.GET.end_date %}?{% if request.GET.exam_id %}exam_id={{ request.GET.exam_id }}&{% endif %}{% if request.GET.exam_name %}exam_name={{ request.GET.exam_name|urlencode }}&{% endif %}{% if request.GET.start_date %}start_date={{ request.GET.start_date }}&{% endif %}{% if request.GET.end_date %}end_date={{ request.GET.end_date }}{% endif %}{% endif %}"
+            method="post" autocomplete="off">
+            {% csrf_token %}
+            <input type="hidden" name="start_date" value="{{ q_start_date }}">
+            <input type="hidden" name="end_date" value="{{ q_end_date }}">
 
-                {% with q_params="" %}
-                    {% if request.GET.exam_id %}{% with q_params=q_params|add:"exam_id="|add:request.GET.exam_id|add:"&" %}{% endwith %}{% endif %}
-                    {% if request.GET.exam_name %}{% with q_params=q_params|add:"exam_name="|add:request.GET.exam_name|add:"&" %}{% endwith %}{% endif %}
-                    {% if request.GET.start_date %}{% with q_params=q_params|add:"start_date="|add:request.GET.start_date|add:"&" %}{% endwith %}{% endif %}
-                    {% if request.GET.end_date %}{% with q_params=q_params|add:"end_date="|add:request.GET.end_date|add:"&" %}{% endwith %}{% endif %}
-                    <script>
-                        // Set form action with query params on error
-                        (function() {
-                            var form = document.getElementById('examSlotForm');
-                            var params = '{{ q_params|slice:":-1" }}';
-                            if (params) {
-                                form.action = form.action + '?' + params;
-                            }
-                        })();
-                    </script>
-                {% endwith %}
+            {% with q_params="" %}
+            {% if request.GET.exam_id %}{% with q_params=q_params|add:"exam_id="|add:request.GET.exam_id|add:"&" %}{%
+            endwith %}{% endif %}
+            {% if request.GET.exam_name %}{% with q_params=q_params|add:"exam_name="|add:request.GET.exam_name|add:"&"
+            %}{% endwith %}{% endif %}
+            {% if request.GET.start_date %}{% with
+            q_params=q_params|add:"start_date="|add:request.GET.start_date|add:"&" %}{% endwith %}{% endif %}
+            {% if request.GET.end_date %}{% with q_params=q_params|add:"end_date="|add:request.GET.end_date|add:"&" %}{%
+            endwith %}{% endif %}
+            <script>
+                // Set form action with query params on error
+                (function () {
+                    var form = document.getElementById('examSlotForm');
+                    var params = '{{ q_params|slice:":-1" }}';
+                    if (params) {
+                        form.action = form.action + '?' + params;
+                    }
+                })();
+            </script>
+            {% endwith %}
 
             <input type="hidden" name="exam_id" value="{{ request.GET.exam_id|default:'' }}">
             <label for="examname">Exam Name:</label>
             <input type="text" id="examname" name="examname" placeholder="Enter exam name" required
-                value="{{ examname|default:form_data.examname|default:''|default_if_none:'' }}" readonly style="background:#f5f5f5;">
+                value="{{ examname|default:form_data.examname|default:''|default_if_none:'' }}" readonly
+                class="bg-f5">
             <label for="examtype">Exam Type:</label>
             <select name="examtype" id="examtype" required>
-                 <option value="">Select Exam Type</option>
-                 <option value="Regular" {% if form_data.examtype == 'Regular' %}selected{% endif %}>Regular</option>
-                 <option value="Supplementary" {% if form_data.examtype == 'Supplementary' %}selected{% endif %}>Supplementary</option>
-                 <option value="Improvement" {% if form_data.examtype == 'Improvement' %}selected{% endif %}>Improvement</option>
+                <option value="">Select Exam Type</option>
+                <option value="Regular" {% if form_data.examtype == 'Regular' %}selected{% endif %}>Regular</option>
+                <option value="Supplementary" {% if form_data.examtype == 'Supplementary' %}selected{% endif %}>
+                    Supplementary</option>
+                <option value="Improvement" {% if form_data.examtype == 'Improvement' %}selected{% endif %}>Improvement
+                </option>
             </select>
 
             <label for="mode">Mode:</label>
             <select name="mode" id="mode" required>
-                 <option value="">Select Mode</option>
-                 <option value="Theoretical" {% if form_data.mode == 'Theoretical' %}selected{% endif %}>Theoretical</option>
-                 <option value="Practical" {% if form_data.mode == 'Practical' %}selected{% endif %}>Practical</option>
-                 <option value="Viva" {% if form_data.mode == 'Viva' %}selected{% endif %}>Viva</option>
-                 <option value="Quiz" {% if form_data.mode == 'Quiz' %}selected{% endif %}>Quiz</option>
-                 <option value="Assignment" {% if form_data.mode == 'Assignment' %}selected{% endif %}>Assignment</option>
+                <option value="">Select Mode</option>
+                <option value="Theoretical" {% if form_data.mode == 'Theoretical' %}selected{% endif %}>Theoretical
+                </option>
+                <option value="Practical" {% if form_data.mode == 'Practical' %}selected{% endif %}>Practical</option>
+                <option value="Viva" {% if form_data.mode == 'Viva' %}selected{% endif %}>Viva</option>
+                <option value="Quiz" {% if form_data.mode == 'Quiz' %}selected{% endif %}>Quiz</option>
+                <option value="Assignment" {% if form_data.mode == 'Assignment' %}selected{% endif %}>Assignment</option>
             </select>
 
             {% with q_start_date=q_start_date q_end_date=q_end_date %}
             <label for="exam_date">Exam Date:</label>
-            <input type="date" id="exam_date" name="exam_date" required value="{{ form_data.exam_date|default:'' }}" min="{{ q_start_date }}" max="{{ q_end_date }}">
+            <input type="date" id="exam_date" name="exam_date" required value="{{ form_data.exam_date|default:'' }}"
+                min="{{ q_start_date }}" max="{{ q_end_date }}">
             {% endwith %}
 
             <label for="starttime">Start Time:</label>
@@ -119,22 +130,22 @@
 
             <label for="slot_code">Slot Code:</label>
             <select name="slot_code" id="slot_code" required>
-                    <option value="">Select Slot</option>
-                    <option value="AM" {% if form_data.slot_code == 'AM' %}selected{% endif %}>AM</option>
-                    <option value="FN" {% if form_data.slot_code == 'FN' %}selected{% endif %}>FN</option>
-                    <option value="MN" {% if form_data.slot_code == 'MN' %}selected{% endif %}>MN</option>
-                    <option value="PM" {% if form_data.slot_code == 'PM' %}selected{% endif %}>PM</option>
-                    <option value="AN" {% if form_data.slot_code == 'AN' %}selected{% endif %}>AN</option>
-                    <option value="EV" {% if form_data.slot_code == 'EV' %}selected{% endif %}>EV</option>
+                <option value="">Select Slot</option>
+                <option value="AM" {% if form_data.slot_code == 'AM' %}selected{% endif %}>AM</option>
+                <option value="FN" {% if form_data.slot_code == 'FN' %}selected{% endif %}>FN</option>
+                <option value="MN" {% if form_data.slot_code == 'MN' %}selected{% endif %}>MN</option>
+                <option value="PM" {% if form_data.slot_code == 'PM' %}selected{% endif %}>PM</option>
+                <option value="AN" {% if form_data.slot_code == 'AN' %}selected{% endif %}>AN</option>
+                <option value="EV" {% if form_data.slot_code == 'EV' %}selected{% endif %}>EV</option>
             </select>
 
         </form>
-        <a href="#" class="action-link" onclick="clearExamSlotForm(); return false;" style="margin-left:10px;">Clear</a>
+        <a href="#" class="action-link ml-10" onclick="clearExamSlotForm(); return false;">Clear</a>
         <a href="#" class="action-link" id="createExamSlotLink">Create Exam Slot</a>
         <!-- Slot Course Details Modal -->
-        <div id="slotCoursesModal" class="modal" style="display:none;position:fixed;z-index:3000;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);overflow:auto;">
-            <div class="modal-content" style="background:#fff;padding:2em;max-width:900px;width:90vw;max-height:90vh;overflow-y:auto;border-radius:10px;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);box-shadow:0 8px 32px rgba(0,0,0,0.25);margin:0;">
-                <span id="closeSlotCoursesModal" style="position:absolute;top:10px;right:16px;font-size:2em;cursor:pointer;">&times;</span>
+        <div id="slotCoursesModal" class="modal modal-z-3000 modal-backdrop-black-5 overflow-auto">
+            <div class="modal-content-wide">
+                <span id="closeSlotCoursesModal" class="close-modal-x close-modal-x-lg">&times;</span>
                 <div id="slotCoursesModalContent">
                     <h2>Slot Courses</h2>
                     <div>Loading...</div>
@@ -168,19 +179,21 @@
                 </tr>
             </thead>
             <tbody id="exam-slots-list">
-                <tr><td colspan="13" style="text-align:center;">Loading...</td></tr>
+                <tr>
+                    <td colspan="13" class="text-center">Loading...</td>
+                </tr>
             </tbody>
         </table>
         <!-- Delete Slot Modal -->
-        <div id="deleteSlotModal" class="modal" style="display:none;position:fixed;z-index:1000;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;">
-            <div class="modal-content" style="background:#fff;padding:2em;max-width:500px;border-radius:8px;position:relative;">
-                <span id="closeDeleteSlotModal" style="position:absolute;top:10px;right:16px;font-size:1.5em;cursor:pointer;">&times;</span>
-                <h2 style="margin-top:0;">Confirm Slot Deletion</h2>
-                <div id="deleteSlotWarning" style="color:#b30000;margin-bottom:1em;"></div>
+        <div id="deleteSlotModal" class="modal modal-z-1000 modal-backdrop-black-4 d-flex-center">
+            <div class="modal-content-base">
+                <span id="closeDeleteSlotModal" class="close-modal-x">&times;</span>
+                <h2 class="mt-0">Confirm Slot Deletion</h2>
+                <div id="deleteSlotWarning" class="warning-text-red"></div>
                 <form id="deleteSlotForm">
                     {% csrf_token %}
                     <input type="hidden" id="deleteSlotId" name="slot_id">
-                    <div id="deleteSlotDetails" style="margin-bottom:1em;"></div>
+                    <div id="deleteSlotDetails" class="mb-1em"></div>
                     <a href="#" id="confirmDeleteSlotLink" class="action-link">Delete</a>
                     <a href="#" id="cancelDeleteSlotBtn" class="action-link">Cancel</a>
                 </form>
@@ -188,10 +201,10 @@
         </div>
         <script>
             window.examIdForSlots = '{{ request.GET.exam_id|default:"" }}';
-            document.addEventListener('DOMContentLoaded', function() {
+            document.addEventListener('DOMContentLoaded', function () {
                 // Force hide all modals on page load
                 var modals = document.querySelectorAll('.modal');
-                modals.forEach(function(modal) {
+                modals.forEach(function (modal) {
                     modal.style.display = 'none';
                 });
                 fetchExamSlotsAjax();

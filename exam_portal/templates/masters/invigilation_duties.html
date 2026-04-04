@@ -1,0 +1,38 @@
+{% extends 'core/base_faculty.html' %}
+{% load static %}
+{% block content %}
+<div class="pages-main">
+    <h1 class="pages-main-head">My Invigilation Duties</h1>
+    <div class="exam-cards-wrapper">
+        {% if duties %}
+            {% for duty in duties %}
+            <div class="exam-card relative">
+                <div class="exam-card-header">
+                    <span class="exam-name">{{ duty.exam_name }}</span>
+                    <div class="exam-status-indicator">
+                    {% if duty.status == 'completed' %}
+                        <span class="status-dot completed"></span>
+                        <span class="status-label completed">Completed</span>
+                    {% else %}
+                        <span class="status-dot upcoming"></span>
+                        <span class="status-label upcoming">Upcoming</span>
+                    {% endif %}
+                </div>
+                </div>
+                <div class="exam-card-body">
+                    <div><strong>Faculty Id :</strong> {{ duty.faculty_id }}</div>
+                    <div><strong>Exam Date :</strong> {{ duty.exam_date|date:'d-M-Y' }}</div>
+                    <div><strong>Exam Type :</strong> {{ duty.exam_type }}</div>
+                    <div><strong>Room No :</strong> {{ duty.room_no }}</div>
+                    <div><strong>Time :</strong> {{ duty.start_time|time:'h:i A' }} - {{ duty.end_time|time:'h:i A' }}</div>
+                    <div><strong>Exam Slot :</strong> {{ duty.exam_slot }}</div>
+                    <div><strong>Duration :</strong> {{ duty.duration }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="no-seating-box">No invigilation duties found for this faculty.</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

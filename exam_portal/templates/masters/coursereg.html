@@ -3,42 +3,55 @@
 {% block content %}
 <div class="pages-main">
     <h1 class="pages-main-head">{% if user.role == 'student' %}My Courses{% else %}Student Course Registrations{% endif %}</h1>
-    {% if user.role != 'student' %}
-        <div class="note-and-actions">
-            <div class="note-text">
-                <p style="color: red;"><strong>Note:</strong> Upload course registration data in <strong>.csv</strong> format.</p>
-                <p style="color: red;">(Download the sample .csv file and add data in the specified structure to avoid errors)</p>
-            </div>
-            <div class="add-data">
-                <form action="{% url 'masters:coursereg_upload' %}" method="post" enctype="multipart/form-data" style="display:inline;">
-                    {% csrf_token %}
-                    <label for="uploadFile" class="control-btn" style="cursor: pointer;">Upload File</label>
-                    <input type="file" id="uploadFile" name="csv_file" style="display: none;" accept=".csv" onchange="this.form.submit()">
-                </form>
-                <a href="{% static 'samples/student_reg_courses.csv' %}" download class="control-btn">Download Sample CSV</a>
-            </div>
+    {% if user.role|lower == 'admin' %}
+    <div class="note-and-actions">
+        <div class="note-text">
+            <p class="text-red"><strong>Note:</strong> Upload course registration data in <strong>.csv</strong>
+                format.</p>
+            <p class="text-red">(Download the sample .csv file and add data in the specified structure to avoid
+                errors)</p>
         </div>
-        <div class="controls" style="padding: 6px 0;">
-            <form id="searchForm" onsubmit="return false;" style="display: flex; align-items: center; gap: 8px;">
-                <label for="studentSearch" style="font-size: 0.98rem;">Student ID:</label>
-                <input type="text" id="studentSearch" name="studentSearch" placeholder="Enter Student ID" autocomplete="off" style="min-width: 160px; font-size: 0.98rem; padding: 6px 10px; border-radius: 5px;" aria-label="Student ID">
-                <a href="#" id="searchStudentLink" class="control-btn search-btn" style="margin-top: 0px;">Search</a>
-                <a href="#" id="resetStudentSearchLink" class="control-btn reset-btn" style="background: #f1f5f9; color: #1E3A5F; border: 1px solid #cbd5e1; margin-top: 0px;">Reset</a>
+        <div class="add-data">
+            <form action="{% url 'masters:coursereg_upload' %}" method="post" enctype="multipart/form-data"
+                class="d-inline">
+                {% csrf_token %}
+                <label for="uploadFile" class="control-btn cursor-pointer">Upload File</label>
+                <input type="file" id="uploadFile" name="csv_file" class="d-none" accept=".csv"
+                    onchange="this.form.submit()">
             </form>
-            <div id="autocomplete-list" class="autocomplete-items" style="position: absolute; z-index: 99;"></div>
+            <a href="{% static 'samples/student_reg_courses.csv' %}" download class="control-btn">Download Sample
+                CSV</a>
         </div>
-        <div class="coursereg-actions-bar" id="courseregActionsBar" style="display:none; margin-top: 16px; justify-content: space-between; align-items: center; gap: 16px;">
-            <div class="pagination-bar" id="courseregPaginationBar" style="display:flex;">
-                <div id="coursereg-pagination"></div>
-            </div>
-            <div class="actions" id="courseregActions" style="display:flex; align-items: center; gap: 16px;">
-                <button type="button" id="printCourseRegBtn"><img src="https://img.icons8.com/?size=100&id=85372&format=png&color=ffffff" alt="Print_img">Print</button>
-                <button type="button" id="downloadCourseRegBtn"><img src="https://img.icons8.com/?size=100&id=83159&format=png&color=ffffff" alt="Download_img">Download Data</button>
-            </div>
-        </div>
+    </div>
     {% endif %}
+    {% if user.role|lower != 'student' %}
+    <div class="controls pv-6">
+        <form id="searchForm" onsubmit="return false;" class="flex-center-gap-8">
+            <label for="studentSearch" class="fs-1">Student ID:</label>
+            <input type="text" id="studentSearch" name="studentSearch" placeholder="Enter Student ID" autocomplete="off"
+                class="search-input-custom"
+                aria-label="Student ID">
+            <a href="#" id="searchStudentLink" class="control-btn search-btn mt-0">Search</a>
+            <a href="#" id="resetStudentSearchLink" class="control-btn reset-btn reset-btn-custom">Reset</a>
+        </form>
+        <div id="autocomplete-list" class="autocomplete-items autocomplete-pos"></div>
+    </div>
+    {% endif %}
+    <div class="coursereg-actions-bar actions-bar-custom" id="courseregActionsBar">
+        <div class="pagination-bar d-flex" id="courseregPaginationBar">
+            <div id="coursereg-pagination"></div>
+        </div>
+        <div class="actions actions-flex-gap-16" id="courseregActions">
+            <button type="button" id="printCourseRegBtn"><img
+                    src="https://img.icons8.com/?size=100&id=85372&format=png&color=ffffff"
+                    alt="Print_img">Print</button>
+            <button type="button" id="downloadCourseRegBtn"><img
+                    src="https://img.icons8.com/?size=100&id=83159&format=png&color=ffffff" alt="Download_img">Download
+                Data</button>
+        </div>
+    </div>
     {% if user.role == "student" %}
-    <div class="table" id="courseregTableContainer" style="margin-top: 24px;">
+    <div class="table mt-24" id="courseregTableContainer">
         <table id="coursereg-table">
             <thead>
                 <tr>
@@ -53,54 +66,53 @@
             </thead>
             <tbody id="coursereg-list">
                 {% if courseregs %}
-                    {% for reg in courseregs %}
-                        {% if reg.student.user == user %}
-                            <tr>
-                                <td>{{ forloop.counter }}</td>
-                                <td>{{ reg.student.student_id }}</td>
-                                <td>{{ reg.student.std_name }}</td>
-                                <td>{{ reg.course.course_code }}</td>
-                                <td>{{ reg.course.course_name }}</td>
-                                <td>{{ reg.academic_year }}</td>
-                                <td>{{ reg.semester }}</td>
-                            </tr>
-                        {% endif %}
-                    {% endfor %}
+                {% for reg in courseregs %}
+                {% if reg.student.user == user %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ reg.student.student_id }}</td>
+                    <td>{{ reg.student.std_name }}</td>
+                    <td>{{ reg.course.course_code }}</td>
+                    <td>{{ reg.course.course_name }}</td>
+                    <td>{{ reg.academic_year }}</td>
+                    <td>{{ reg.semester }}</td>
+                </tr>
+                {% endif %}
+                {% endfor %}
                 {% endif %}
             </tbody>
         </table>
         {% if page_obj %}
-        <div class="pagination-bar" id="courseregPaginationBar" style="display:flex; margin-top: 16px;">
+        <div class="pagination-bar pagination-bar-bottom" id="courseregPaginationBar">
             <div id="coursereg-pagination">
                 {% if page_obj.has_previous %}
-                    <a href="#" class="page-arrow" data-page="1">&#171;</a>
-                    <a href="#" class="page-arrow" data-page="{{ page_obj.previous_page_number }}">&#8592;</a>
+                <a href="#" class="page-arrow" data-page="1">&#171;</a>
+                <a href="#" class="page-arrow" data-page="{{ page_obj.previous_page_number }}">&#8592;</a>
                 {% else %}
-                    <span class="page-arrow disabled">&#171;</span>
-                    <span class="page-arrow disabled">&#8592;</span>
+                <span class="page-arrow disabled">&#171;</span>
+                <span class="page-arrow disabled">&#8592;</span>
                 {% endif %}
                 {% for i in page_obj.paginator.page_range %}
-                    {% if i > page_obj.number|add:'-5' and i < page_obj.number|add:'5' %}
-                        {% if i == page_obj.number %}
-                            <span class="page-num current">{{ i }}</span>
-                        {% else %}
-                            <a href="#" class="page-num" data-page="{{ i }}">{{ i }}</a>
-                        {% endif %}
+                {% if i > page_obj.number|add:'-5' and i < page_obj.number|add:'5' %} {% if i == page_obj.number %} <span
+                    class="page-num current">{{ i }}</span>
+                    {% else %}
+                    <a href="#" class="page-num" data-page="{{ i }}">{{ i }}</a>
                     {% endif %}
-                {% endfor %}
-                {% if page_obj.has_next %}
+                    {% endif %}
+                    {% endfor %}
+                    {% if page_obj.has_next %}
                     <a href="#" class="page-arrow" data-page="{{ page_obj.next_page_number }}">&#8594;</a>
                     <a href="#" class="page-arrow" data-page="{{ page_obj.paginator.num_pages }}">&#187;</a>
-                {% else %}
+                    {% else %}
                     <span class="page-arrow disabled">&#8594;</span>
                     <span class="page-arrow disabled">&#187;</span>
-                {% endif %}
+                    {% endif %}
             </div>
         </div>
         {% endif %}
     </div>
     {% else %}
-    <div class="table" id="courseregTableContainer" style="margin-top: 24px; display: none;">
+    <div class="table mt-24 d-none" id="courseregTableContainer">
         <table id="coursereg-table">
             <thead>
                 <tr>
@@ -111,15 +123,19 @@
                     <th>Course Name</th>
                     <th>Academic Year</th>
                     <th>Semester</th>
-                    <th>Actions</th>
+                    {% if user.role|lower == 'admin' %}<th>Actions</th>{% endif %}
                 </tr>
             </thead>
             <tbody id="coursereg-list">
-                <!-- AJAX will fill this -->
+                {% if user.role|lower == 'admin' %}
+                <!-- AJAX will fill this with Actions column -->
+                {% else %}
+                <!-- AJAX will fill this without Actions column -->
+                {% endif %}
             </tbody>
         </table>
         <!-- Pagination for admin is handled by AJAX/JS only -->
     </div>
     {% endif %}
 </div>
-{% endblock %}
+{% endblock %}
