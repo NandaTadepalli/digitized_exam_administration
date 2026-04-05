@@ -570,12 +570,20 @@ function courseregLoadCourseRegDataByStudentId(studentId, page = 1) {
         .then(resp => resp.json())
         .then(data => {
             document.getElementById('coursereg-list').innerHTML = data.table_html;
-            document.getElementById('courseregTableContainer').style.display = 'block';
+            const tableContainer = document.getElementById('courseregTableContainer');
+            if (tableContainer) {
+                tableContainer.classList.remove('d-none');
+                tableContainer.style.display = 'block';
+            }
             // Hide old containers if present
             if (document.getElementById('courseregActions')) document.getElementById('courseregActions').style.display = 'none';
             if (document.getElementById('courseregPaginationBar')) document.getElementById('courseregPaginationBar').style.display = 'none';
             // Show new flex container
-            if (document.getElementById('courseregActionsBar')) document.getElementById('courseregActionsBar').style.display = 'flex';
+            const actionsBar = document.getElementById('courseregActionsBar');
+            if (actionsBar) {
+                actionsBar.classList.remove('d-none');
+                actionsBar.style.display = 'flex';
+            }
             // Show inner containers
             if (document.getElementById('courseregActions')) document.getElementById('courseregActions').style.display = 'flex';
             if (document.getElementById('courseregPaginationBar')) document.getElementById('courseregPaginationBar').style.display = 'flex';
@@ -612,8 +620,16 @@ if (resetStudentSearchLinkElem) {
     resetStudentSearchLinkElem.addEventListener('click', function (e) {
         e.preventDefault();
         studentSearchElem.value = '';
-        document.getElementById('courseregTableContainer').style.display = 'none';
-        if (document.getElementById('courseregActionsBar')) document.getElementById('courseregActionsBar').style.display = 'none';
+        const tableContainer = document.getElementById('courseregTableContainer');
+        if (tableContainer) {
+            tableContainer.classList.add('d-none');
+            tableContainer.style.display = 'none';
+        }
+        const actionsBar = document.getElementById('courseregActionsBar');
+        if (actionsBar) {
+            actionsBar.classList.add('d-none');
+            actionsBar.style.display = 'none';
+        }
         if (document.getElementById('courseregActions')) document.getElementById('courseregActions').style.display = 'none';
         if (document.getElementById('courseregPaginationBar')) document.getElementById('courseregPaginationBar').style.display = 'none';
     });
@@ -945,7 +961,7 @@ function fetchExamSlotsAjax() {
                             html += `<div>No rooms allocated for this slot.</div>`;
                         } else {
                             html += `<div class='dashboard-popup-table-wrapper'><table class='dashboard-popup-table'>`;
-                            html += `<thead><tr><th>Room No</th><th>Type</th><th>Capacity</th><th>Block</th></tr></thead><tbody>`;
+                            html += `<thead><tr><th>Room No</th><th>Room Type</th><th>Capacity</th><th>Block</th></tr></thead><tbody>`;
                             data.rooms.forEach(function (room) {
                                 html += `<tr>`;
                                 html += `<td>${room.room_no ? room.room_no : 'N/A'}</td>`;
@@ -1225,7 +1241,7 @@ function fetchExamSlotsAjax() {
                             html += `<div>No rooms allocated for this slot.</div>`;
                         } else {
                             html += `<div class='dashboard-popup-table-wrapper'><table class='dashboard-popup-table'>`;
-                            html += `<thead><tr><th>Room No</th><th>Type</th><th>Capacity</th><th>Block</th></tr></thead><tbody>`;
+                            html += `<thead><tr><th>Room No</th><th>Room Type</th><th>Capacity</th><th>Block</th></tr></thead><tbody>`;
                             data.rooms.forEach(function (room) {
                                 html += `<tr>`;
                                 html += `<td>${room.room_no ? room.room_no : 'N/A'}</td>`;
@@ -1275,6 +1291,7 @@ function fetchExamSlotsAjax() {
             document.getElementById('edit_start_time').value = row.children[3].textContent.trim();
             document.getElementById('edit_end_time').value = row.children[4].textContent.trim();
             document.getElementById('edit_slot_code').value = row.children[5].textContent.trim();
+            document.getElementById('edit_registration_type').value = row.children[6].textContent.trim();
             document.getElementById('editSlotModal').style.display = 'flex';
         }
     });
@@ -1292,14 +1309,15 @@ function fetchExamSlotsAjax() {
     var tbody = document.getElementById('exam-slots-list');
     if (!tbody) return;
     if (!examId) {
-        tbody.innerHTML = '<tr><td colspan="12" class="text-center">No exam selected.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="14" class="text-center">No exam selected.</td></tr>';
         return;
     }
-    fetch('/ops/ajax_exam_slots/?exam_id=' + encodeURIComponent(examId))
+    const regTypeFilter = document.getElementById('filter_registration_type')?.value || '';
+    fetch(`/ops/ajax_exam_slots/?exam_id=${encodeURIComponent(examId)}&registration_type=${encodeURIComponent(regTypeFilter)}`)
         .then(response => response.json())
         .then(data => {
             if (data.slots.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="12" class="text-center">No exam slots created yet.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="14" class="text-center">No exam slots created yet.</td></tr>';
             } else {
                 tbody.innerHTML = '';
                 // Sort slots by exam_date, then start_time (both ascending)
@@ -1377,6 +1395,7 @@ function fetchExamSlotsAjax() {
                         <td>${to12Hour(slot.start_time) || ''}</td>
                         <td>${to12Hour(slot.end_time) || ''}</td>
                         <td>${slot.slot_code || ''}</td>
+                        <td>${slot.registration_type || 'REGULAR'}</td>
                         ${statusCell}
                         <td>${courseBadge}</td>
                         <td>${slot.student_count || 0}</td>
@@ -1390,7 +1409,7 @@ function fetchExamSlotsAjax() {
             }
         })
         .catch(() => {
-            tbody.innerHTML = '<tr><td colspan="10" class="text-center">Error loading slots.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="14" class="text-center">Error loading slots.</td></tr>';
         });
     // Utility to show popup message (top-right)
         // Click handler for new status column
@@ -1403,15 +1422,17 @@ function fetchExamSlotsAjax() {
                 if (statusSpanPending) {
                     let missing = [];
                     if (row) {
-                        // Check room assignment
-                        const roomCell = row.children[9];
-                        if (roomCell && roomCell.textContent.includes('Pending')) missing.push('Room Assignment');
-                        // Check faculty assignment
-                        const facultyCell = row.children[10];
-                        if (facultyCell && facultyCell.textContent.includes('Pending')) missing.push('Faculty Assignment');
-                        // Check course count
-                        const courseCountCell = row.children[7];
+                        // Check registration type (index 6)
+                        // Check statusCell (index 7)
+                        // Check course count (index 8)
+                        const courseCountCell = row.children[8];
                         if (courseCountCell && courseCountCell.textContent.trim() === 'count : 0') missing.push('Course Assignment');
+                        // Check room assignment (index 10)
+                        const roomCell = row.children[10];
+                        if (roomCell && roomCell.textContent.includes('Pending')) missing.push('Room Assignment');
+                        // Check faculty assignment (index 11)
+                        const facultyCell = row.children[11];
+                        if (facultyCell && facultyCell.textContent.includes('Pending')) missing.push('Faculty Assignment');
                     }
                     let msg = 'Status is Pending.<br>Some required actions are incomplete.';
                     if (missing.length > 0) {
@@ -1939,6 +1960,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             <td><input type="checkbox" name="selected_groups" value="${group.course_code}|${group.regulation}|${group.academic_year}|${group.semester}" ${disabled} ${group.clash ? 'tabindex="-1" aria-disabled="true"' : ''}></td>
                             <td>${group.course_code}</td>
                             <td>${group.course_name}</td>
+                            <td>${group.registration_type}</td>
                             <td>${group.regulation}</td>
                             <td>${group.academic_year}</td>
                             <td>${group.semester}</td>
@@ -1949,7 +1971,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     form.style.display = '';
                     if (confirmBtn) confirmBtn.style.display = '';
                 } else {
-                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">No course registrations found for the selected filters.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;">No course registrations found for the selected filters.</td></tr>';
                     form.style.display = '';
                     if (confirmBtn) confirmBtn.style.display = 'none';
                 }
@@ -2017,6 +2039,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         <td><input type="checkbox" name="selected_groups" value="${group.course_code}|${group.regulation}|${group.academic_year}|${group.semester}" ${disabled} ${group.clash ? 'tabindex="-1" aria-disabled="true"' : ''}></td>
                         <td>${group.course_code}</td>
                         <td>${group.course_name}</td>
+                        <td>${group.registration_type}</td>
                         <td>${group.regulation}</td>
                         <td>${group.academic_year}</td>
                         <td>${group.semester}</td>
@@ -2027,7 +2050,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     form.style.display = '';
                     if (confirmBtn) confirmBtn.style.display = '';
                 } else {
-                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">No course registrations found for the selected filters.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;">No course registrations found for the selected filters.</td></tr>';
                     form.style.display = '';
                     if (confirmBtn) confirmBtn.style.display = 'none';
                 }
@@ -2047,7 +2070,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const rowStudentMap = new Map();
             allCheckboxes.forEach(cb => {
                 const row = cb.closest('tr');
-                const students = row.children[6].dataset.students ? row.children[6].dataset.students.split(',') : [];
+                const students = row.children[7].dataset.students ? row.children[7].dataset.students.split(',') : [];
                 rowStudentMap.set(cb, students);
             });
             // Build a Set of all selected student IDs

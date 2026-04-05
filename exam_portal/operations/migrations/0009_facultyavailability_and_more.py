@@ -22,10 +22,10 @@ class Migration(migrations.Migration):
                 'db_table': 'faculty_availability',
             },
         ),
-        migrations.RemoveConstraint(
-            model_name='examslot',
-            name='uq_exam_slot_time',
-        ),
+        # migrations.RemoveConstraint(
+        #     model_name='examslot',
+        #     name='uq_exam_slot_time',
+        # ),
         migrations.RemoveConstraint(
             model_name='roomallocation',
             name='uq_exam_room',

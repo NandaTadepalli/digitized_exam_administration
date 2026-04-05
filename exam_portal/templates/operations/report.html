@@ -1,0 +1,105 @@
+{% extends "core/base_admin.html" %}
+{% load static %}
+
+{% block title %}Reports & Analytics | Admin Portal{% endblock %}
+
+{% block content %}
+<div class="pages-main">
+    <div class="reports-header-flex">
+        <h1 class="pages-main-head">Reports & Analytics</h1>
+        <p class="setting-paragraph" style="margin-top: -15px; margin-bottom: 30px;">Access critical operational data and generated statements for examinations.</p>
+    </div>
+
+    <div class="settings-container">
+        <!-- Academic & Registration -->
+        <div class="settings-card">
+            <div class="category-label">Academic</div>
+            <div class="report-card-icon">
+                <img src="https://img.icons8.com/ios-filled/50/2563eb/student-male.png" alt="Students">
+            </div>
+            <h2 class="settings-card-head">Student Registration</h2>
+            <p class="setting-paragraph">Summary of students registered for various courses and registration types.</p>
+            <div class="report-actions">
+                <a href="{% url 'operations:report_student_coursereg' %}" class="btn-report btn-view-report">
+                    <img src="https://img.icons8.com/ios-filled/16/ffffff/visible.png" alt="view"> View Report
+                </a>
+            </div>
+        </div>
+
+        <!-- Examination Scheduling -->
+        <div class="settings-card">
+            <div class="category-label">Examination</div>
+            <div class="report-card-icon">
+                <img src="https://img.icons8.com/ios-filled/50/2563eb/calendar-2.png" alt="Timetable">
+            </div>
+            <h2 class="settings-card-head">Consolidated Timetable</h2>
+            <p class="setting-paragraph">Master schedule of all exam slots, dates, and courses for examinations.</p>
+            <div class="report-actions">
+                <a href="{% url 'operations:report_timetable' %}" class="btn-report btn-view-report">
+                    <img src="https://img.icons8.com/ios-filled/16/ffffff/visible.png" alt="view"> View Table
+                </a>
+            </div>
+        </div>
+
+        <!-- Logistics & Rooms -->
+        <div class="settings-card">
+            <div class="category-label">Logistics</div>
+            <div class="report-card-icon">
+                <img src="https://img.icons8.com/ios-filled/50/2563eb/classroom.png" alt="Rooms">
+            </div>
+            <h2 class="settings-card-head">Room Occupancy</h2>
+            <p class="setting-paragraph">Overview of room usage, capacity, and student density for exam slots.</p>
+            <div class="report-actions">
+                <a href="{% url 'operations:report_room_occupancy' %}" class="btn-report btn-view-report">
+                    <img src="https://img.icons8.com/ios-filled/16/ffffff/visible.png" alt="view"> View Summary
+                </a>
+            </div>
+        </div>
+
+        <!-- Invigilation -->
+        <div class="settings-card">
+            <div class="category-label">Faculty</div>
+            <div class="report-card-icon">
+                <img src="https://img.icons8.com/ios-filled/50/2563eb/teacher.png" alt="Invigilation">
+            </div>
+            <h2 class="settings-card-head">Invigilation Chart</h2>
+            <p class="setting-paragraph">Consolidated report of faculty duty assignments across all rooms.</p>
+            <div class="report-actions">
+                <a href="{% url 'operations:report_invigilation' %}" class="btn-report btn-view-report">
+                    <img src="https://img.icons8.com/ios-filled/16/ffffff/visible.png" alt="view"> View Chart
+                </a>
+            </div>
+        </div>
+
+        <!-- Seating -->
+        <div class="settings-card">
+            <div class="category-label">Operations</div>
+            <div class="report-card-icon">
+                <img src="https://img.icons8.com/ios-filled/50/2563eb/grid.png" alt="Seating">
+            </div>
+            <h2 class="settings-card-head">Master Seating</h2>
+            <p class="setting-paragraph">Detailed seating plan for each room and slot for easy navigation.</p>
+            <div class="report-actions">
+                <a href="{% url 'operations:report_master_seating' %}" class="btn-report btn-view-report">
+                    <img src="https://img.icons8.com/ios-filled/16/ffffff/visible.png" alt="view"> View Plan
+                </a>
+            </div>
+        </div>
+
+        <!-- Attendance -->
+        <div class="settings-card">
+            <div class="category-label">Attendance</div>
+            <div class="report-card-icon">
+                <img src="https://img.icons8.com/ios-filled/50/2563eb/attendance-mark.png" alt="Attendance">
+            </div>
+            <h2 class="settings-card-head">Attendance Sheets</h2>
+            <p class="setting-paragraph">Pre-populated sheets for each room to simplify exam marking.</p>
+            <div class="report-actions">
+                <a href="{% url 'operations:report_attendance' %}" class="btn-report btn-view-report">
+                    <img src="https://img.icons8.com/ios-filled/16/ffffff/visible.png" alt="view"> View Report
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -363,21 +363,13 @@ def exam_rooms_alloc(request):
                     request.session['room_alloc_warning'] = f"Deleted rooms: {', '.join(deleted_rooms)}"
                 exam_obj = None
                 exam_slot_obj = None
-                if exams and hasattr(exams, '__iter__') and len(exams) > 0:
-                    exam_obj = exams[0]
-                    exam_slot_obj = exam_obj.exam_slot
                 params = {}
-                if exam_obj and exam_slot_obj:
-                    params['exam_id'] = exam_slot_obj.examination.id if exam_slot_obj.examination else ''
-                    params['exam_name'] = exam_slot_obj.examination.exam_name if exam_slot_obj.examination else ''
-                    params['start_date'] = exam_slot_obj.examination.start_date.strftime('%Y-%m-%d') if exam_slot_obj.examination and exam_slot_obj.examination.start_date else ''
-                    params['end_date'] = exam_slot_obj.examination.end_date.strftime('%Y-%m-%d') if exam_slot_obj.examination and exam_slot_obj.examination.end_date else ''
                 from urllib.parse import urlencode
                 url = reverse('operations:exams')
                 if params:
                     url += '?' + urlencode(params)
                 return redirect(url)
-            if request.method == "GET" and exams and hasattr(exams, '__iter__') and len(exams) > 0:
+            if request.method == "GET":
                 from .models import RoomAllocation
                 allocated_room_ids = list(RoomAllocation.objects.filter(exam_slot=slot).values_list('room_id', flat=True))
                 # Auto-select rooms if none are allocated, using safe seating estimator
@@ -385,7 +377,7 @@ def exam_rooms_alloc(request):
                     from .allocations import estimate_rooms_optimized, get_safe_capacity
                     from operations.models import StudentExamMap
                     # Use the student exam maps for the estimator
-                    student_exam_maps_fallback = list(StudentExamMap.objects.filter(exam__in=exams).select_related('exam__course'))
+                    student_exam_maps_fallback = list(StudentExamMap.objects.filter(exam__exam_slot=slot).select_related('exam__course'))
                     
                     available_rooms_list = list(Room.objects.filter(is_active=True))
                     optimized_rooms = estimate_rooms_optimized(student_exam_maps_fallback, available_rooms_list)
@@ -495,6 +487,7 @@ def exam_faculty_alloc(request):
             return redirect(f'/ops/exam_faculty_alloc/?slot_id={slot.id}')
         # Always show currently allocated faculty for this slot
         allocated_faculty_objs = Faculty.objects.filter(facultyavailability__exam_slot=slot)
+        from operations.models import Exam
         exams = Exam.objects.filter(exam_slot=slot)
         from operations.models import FacultyCourse
         found_assignment = False
@@ -719,6 +712,7 @@ def exams(request):
     # Build a dict of slot_id to status
     exam_status = {}
     for slot in slot_list:
+        from operations.models import Exam
         if Exam.objects.filter(exam_slot=slot).exists():
             exam_status[slot.id] = 'Created'
         else:
@@ -734,7 +728,11 @@ def exams(request):
         del request.session['room_alloc_warning']
 
     # Get examname from Examinations table using exam_id from GET parameters
+    from .models import StudentCourse
+    reg_types = list(StudentCourse.objects.values_list('registration_type', flat=True).distinct().order_by('registration_type'))
+    
     exam_id = request.GET.get('exam_id')
+    q_reg_type = request.GET.get('registration_type') or ''
     examname = ''
     if exam_id:
         try:
@@ -744,6 +742,7 @@ def exams(request):
                 examname = exam_obj.exam_name
         except Exception:
             examname = ''
+
     q_start_date = request.GET.get('start_date') or request.POST.get('start_date') or ''
     q_end_date = request.GET.get('end_date') or request.POST.get('end_date') or ''
     if request.method == "POST":
@@ -751,6 +750,7 @@ def exams(request):
         exam_name = request.POST.get("examname", "").strip()
         exam_type = request.POST.get("examtype", "")
         mode = request.POST.get("mode", "")
+        reg_type = request.POST.get("registration_type", "REGULAR")
         if mode and len(mode) > 25:
             mode = mode[:25]
         exam_date = request.POST.get("exam_date", "")
@@ -767,7 +767,8 @@ def exams(request):
             'Exam Date': exam_date,
             'Start Time': start_time,
             'End Time': end_time,
-            'Slot Code': slot_code
+            'Slot Code': slot_code,
+            'Registration Type': reg_type
         }
         missing = [name for name, value in required_fields.items() if not value]
         if missing:
@@ -779,7 +780,9 @@ def exams(request):
                 'exam_status': exam_status,
                 'examname': examname,
                 'q_start_date': q_start_date,
-                'q_end_date': q_end_date
+                'q_end_date': q_end_date,
+                'reg_types': reg_types,
+                'q_reg_type': q_reg_type
             })
 
         import datetime
@@ -794,7 +797,9 @@ def exams(request):
                 'exam_status': exam_status,
                 'examname': examname,
                 'q_start_date': q_start_date,
-                'q_end_date': q_end_date
+                'q_end_date': q_end_date,
+                'reg_types': reg_types,
+                'q_reg_type': q_reg_type
             })
         if exam_date_obj < today:
             messages.error(request, "Exam date must be today or later.")
@@ -804,7 +809,9 @@ def exams(request):
                 'exam_status': exam_status,
                 'examname': examname,
                 'q_start_date': q_start_date,
-                'q_end_date': q_end_date
+                'q_end_date': q_end_date,
+                'reg_types': reg_types,
+                'q_reg_type': q_reg_type
             })
 
         try:
@@ -813,12 +820,16 @@ def exams(request):
         except ValueError:
             messages.error(request, "Invalid time format.")
             return render(request, "operations/exams.html", {
-                'form_data': request.POST
+                'form_data': request.POST,
+                'reg_types': reg_types,
+                'q_reg_type': q_reg_type
             })
         if start_time_obj >= end_time_obj:
             messages.error(request, "Start time should be before end time.")
             return render(request, "operations/exams.html", {
-                'form_data': request.POST
+                'form_data': request.POST,
+                'reg_types': reg_types,
+                'q_reg_type': q_reg_type
             })
         # Direct assignment for exam_type, mode, and slot_code
         # Map exam type to short code to fit DB column
@@ -845,10 +856,11 @@ def exams(request):
                 end_time=end_time,
                 slot_code=slot_code_db,
                 exam_type=exam_type_db,
-                mode=mode_db
+                mode=mode_db,
+                registration_type=reg_type
             ).exists()
             if clash_exists:
-                messages.error(request, "An exam slot with the same date, start time, end time, slot code, exam type, and mode already exists. Please choose a different time or slot.")
+                messages.error(request, "An exam slot with the same date, start time, end time, slot code, exam type, mode and registration type already exists.")
             else:
                 slot = ExamSlot(
                     examination=exam_obj,
@@ -857,7 +869,8 @@ def exams(request):
                     exam_date=exam_date,
                     start_time=start_time,
                     end_time=end_time,
-                    slot_code=slot_code_db
+                    slot_code=slot_code_db,
+                    registration_type=reg_type
                 )
                 slot.save()
                 messages.success(request, "Exam slot created successfully.")
@@ -874,6 +887,8 @@ def exams(request):
                     query_params['start_date'] = q_start_date
                 if q_end_date:
                     query_params['end_date'] = q_end_date
+                if q_reg_type:
+                    query_params['registration_type'] = q_reg_type
                 url = reverse('operations:exams')
                 if query_params:
                     url += '?' + urllib.parse.urlencode(query_params)
@@ -888,7 +903,9 @@ def exams(request):
         'exam_status': exam_status,
         'examname': examname,
         'q_start_date': q_start_date,
-        'q_end_date': q_end_date
+        'q_end_date': q_end_date,
+        'reg_types': reg_types,
+        'q_reg_type': q_reg_type
     })
 
 def roomalloc(request):
@@ -916,7 +933,13 @@ def roomalloc_content(request):
     return render(request, "operations/roomalloc_content.html")
 
 def report(request):
-    return render(request, "operations/report.html")
+    from .models import Examinations, StudentCourse
+    acd_years = StudentCourse.objects.values_list('academic_year', flat=True).distinct().order_by('-academic_year')
+    exams = Examinations.objects.all().order_by('-start_date')
+    return render(request, "operations/report.html", {
+        'acd_years': acd_years,
+        'exams': exams
+    })
 
 @login_required
 def exam_scheduling(request, slot_id):
@@ -935,6 +958,8 @@ def exam_scheduling(request, slot_id):
         from operations.models import StudentExamMap, StudentCourse
         import logging
         logging.info(f"Scheduling POST: filter_academic_year={filter_academic_year}, filter_semester={filter_semester}, filter_regulation={filter_regulation}")
+        import collections
+        error_groups = collections.defaultdict(list)
         for group in selected:
             # group format: course_code|regulation|academic_year|semester
             try:
@@ -968,29 +993,36 @@ def exam_scheduling(request, slot_id):
                     course=course,
                     academic_year=filter_academic_year,
                     semester=filter_semester,
-                    student__batch__batch_code=regulation
+                    student__batch__batch_code=regulation,
+                    registration_type=slot.registration_type
                 ).select_related('student')
-                logging.info(f"StudentCourse Query: course={course_code}, academic_year={filter_academic_year}, semester={filter_semester}, batch_code={regulation}")
+                logging.info(f"StudentCourse Query: course={course_code}, academic_year={filter_academic_year}, semester={filter_semester}, batch_code={regulation}, registration_type={slot.registration_type}")
                 logging.info(f"Scheduling group {group}: Found {students.count()} students.")
                 logging.info(f"Student IDs: {[reg.student.id for reg in students]}")
                 for reg in students:
                     StudentExamMap.objects.create(
                         exam=exam,
                         student=reg.student,
-                        attempt_type="REGULAR",
+                        attempt_type=slot.registration_type,
                         status="REGISTERED"
                     )
                 created += 1
             except Exception as e:
                 import logging
                 logging.exception(f"Error scheduling exam for group {group}: {e}")
-                messages.error(request, f"Error scheduling exam for group {group}: {e}")
+                error_groups[str(e)].append(group)
+
+        if error_groups:
+            for msg, groups in error_groups.items():
+                groups_str = ", ".join(groups)
+                messages.error(request, f"Error for groups [{groups_str}]: {msg}")
+
         from django.shortcuts import redirect
         if created:
             messages.success(request, f"Scheduled {created} exam(s) successfully.")
             from django.urls import reverse
             return redirect(reverse('operations:schedule_exam', kwargs={'slot_id': slot_id}))
-        else:
+        elif not error_groups:
             messages.error(request, "No exams were scheduled. Please try again.")
     # Only fetch filter values for dropdowns
     courseregs = StudentCourse.objects.all()
@@ -1004,4 +1036,213 @@ def exam_scheduling(request, slot_id):
         'academic_years': academic_years,
         'semesters': semesters,
         'regulations': regulations,
+    })
+
+def report_timetable(request):
+    from .models import Examinations, ExamSlot
+    from django.shortcuts import render
+    exam_id = request.GET.get('exam_id')
+    exams = Examinations.objects.all().order_by('-start_date')
+    
+    exam = None
+    slots = []
+    if exam_id:
+        try:
+            exam = Examinations.objects.get(id=exam_id)
+            slots = ExamSlot.objects.filter(examination=exam).order_by('exam_date', 'start_time')
+        except Examinations.DoesNotExist:
+            pass
+    
+    return render(request, "operations/reports/timetable.html", {
+        'exams': exams,
+        'exam': exam,
+        'slots': slots,
+        'selected_exam_id': exam_id
+    })
+
+def report_room_occupancy(request):
+    from .models import Examinations, ExamSlot, RoomAllocation, SeatingPlan
+    from django.shortcuts import render
+    exam_id = request.GET.get('exam_id')
+    exams = Examinations.objects.all().order_by('-start_date')
+    
+    exam = None
+    report_data = []
+    if exam_id:
+        try:
+            exam = Examinations.objects.get(id=exam_id)
+            slots = ExamSlot.objects.filter(examination=exam).order_by('exam_date')
+            for slot in slots:
+                allocations = RoomAllocation.objects.filter(exam_slot=slot).select_related('room')
+                for alloc in allocations:
+                    seated_count = SeatingPlan.objects.filter(exam_slot=slot, room=alloc.room).count()
+                    utilization = round((seated_count / alloc.room.capacity) * 100, 1) if alloc.room.capacity > 0 else 0
+                    
+                    # Determine color class or hex
+                    if utilization > 90:
+                        util_color = "#ef4444"
+                        util_status = "high"
+                    elif utilization > 70:
+                        util_color = "#f59e0b"
+                        util_status = "med"
+                    else:
+                        util_color = "#10b981"
+                        util_status = "low"
+
+                    report_data.append({
+                        'slot': slot,
+                        'room': alloc.room,
+                        'capacity': alloc.room.capacity,
+                        'seated': seated_count,
+                        'utilization': utilization,
+                        'util_color': util_color,
+                        'util_status': util_status
+                    })
+        except Examinations.DoesNotExist:
+            pass
+            
+    return render(request, "operations/reports/room_occupancy.html", {
+        'exams': exams,
+        'exam': exam,
+        'report_data': report_data,
+        'selected_exam_id': exam_id
+    })
+
+def report_student_coursereg(request):
+    from .models import StudentCourse
+    from django.db.models import Count
+    from django.shortcuts import render
+    acd_year = request.GET.get('acd_year')
+    acd_years = StudentCourse.objects.values_list('academic_year', flat=True).distinct().order_by('-academic_year')
+    
+    regs = StudentCourse.objects.all()
+    if acd_year:
+        regs = regs.filter(academic_year=acd_year)
+    
+    summary = regs.values('course__course_code', 'course__course_name', 'registration_type') \
+                  .annotate(count=Count('id')) \
+                  .order_by('course__course_code')
+    
+    return render(request, "operations/reports/student_coursereg.html", {
+        'summary': summary,
+        'acd_year': acd_year,
+        'acd_years': acd_years
+    })
+
+def report_invigilation(request):
+    from .models import Examinations, ExamSlot, InvigilationDuty
+    from django.shortcuts import render
+    exam_id = request.GET.get('exam_id')
+    exams = Examinations.objects.all().order_by('-start_date')
+    
+    exam = None
+    report_data = []
+    if exam_id:
+        try:
+            exam = Examinations.objects.get(id=exam_id)
+            duties = InvigilationDuty.objects.filter(exam_slot__examination=exam).select_related('exam_slot', 'faculty', 'room').order_by('exam_slot__exam_date', 'exam_slot__slot_code', 'room__room_code')
+            report_data = duties
+        except Examinations.DoesNotExist:
+            pass
+            
+    return render(request, "operations/reports/invigilation.html", {
+        'exams': exams,
+        'exam': exam,
+        'report_data': report_data,
+        'selected_exam_id': exam_id
+    })
+
+def report_master_seating(request):
+    from .models import Examinations, SeatingPlan
+    from django.shortcuts import render
+    exam_id = request.GET.get('exam_id')
+    exams = Examinations.objects.all().order_by('-start_date')
+    
+    exam = None
+    report_data = []
+    if exam_id:
+        try:
+            exam = Examinations.objects.get(id=exam_id)
+            plans = SeatingPlan.objects.filter(exam_slot__examination=exam).select_related('student_exam__student', 'student_exam__exam__course', 'room', 'exam_slot').order_by('exam_slot__exam_date', 'room__room_code', 'row_no', 'seat_no')
+            report_data = plans
+        except Examinations.DoesNotExist:
+            pass
+            
+    return render(request, "operations/reports/master_seating.html", {
+        'exams': exams,
+        'exam': exam,
+        'report_data': report_data,
+        'selected_exam_id': exam_id
+    })
+
+def report_attendance(request):
+    from .models import Examinations, ExamSlot, RoomAllocation, SeatingPlan, InvigilationDuty, Attendance, StudentExamMap
+    from django.shortcuts import render
+    import math
+    
+    exam_id = request.GET.get('exam_id')
+    exams = Examinations.objects.all().order_by('-start_date')
+    
+    exam = None
+    report_data = []
+    stats = {'total': 0, 'present': 0, 'absent': 0, 'unmarked': 0}
+    
+    if exam_id:
+        try:
+            exam = Examinations.objects.get(id=exam_id)
+            slots = ExamSlot.objects.filter(examination=exam).order_by('exam_date', 'slot_code')
+            
+            for slot in slots:
+                rooms = RoomAllocation.objects.filter(exam_slot=slot).select_related('room')
+                for r_alloc in rooms:
+                    room = r_alloc.room
+                    seating = SeatingPlan.objects.filter(exam_slot=slot, room=room).select_related('student_exam__student', 'student_exam__exam__course').order_by('row_no', 'seat_no')
+                    duties = list(InvigilationDuty.objects.filter(exam_slot=slot, room=room).select_related('faculty').order_by('faculty__faculty_id'))
+                    
+                    student_list = list(seating)
+                    total_stud = len(student_list)
+                    faculty_count = len(duties)
+                    
+                    # Replicate division logic used in marking
+                    for idx, stud_plan in enumerate(student_list):
+                        stats['total'] += 1
+                        assigned_faculty = None
+                        if faculty_count > 0:
+                            per_faculty = math.ceil(total_stud / faculty_count)
+                            faculty_idx = idx // per_faculty
+                            if faculty_idx < faculty_count:
+                                assigned_faculty = duties[faculty_idx].faculty
+                        
+                        # Get actual attendance record
+                        att_record = Attendance.objects.filter(student_exam=stud_plan.student_exam).first()
+                        
+                        status = "NOT MARKED"
+                        marked_by = None
+                        if att_record:
+                            status = att_record.status
+                            marked_by = att_record.marked_by
+                            if status == "PRESENT": stats['present'] += 1
+                            else: stats['absent'] += 1
+                        else:
+                            stats['unmarked'] += 1
+                            
+                        report_data.append({
+                            'slot': slot,
+                            'room': room,
+                            'student': stud_plan.student_exam.student,
+                            'course': stud_plan.student_exam.exam.course,
+                            'assigned_to': assigned_faculty,
+                            'marked_by': marked_by,
+                            'status': status,
+                            'time': att_record.marked_at if att_record else None
+                        })
+        except Examinations.DoesNotExist:
+            pass
+            
+    return render(request, "operations/reports/attendance.html", {
+        'exams': exams,
+        'exam': exam,
+        'report_data': report_data,
+        'stats': stats,
+        'selected_exam_id': exam_id
     })

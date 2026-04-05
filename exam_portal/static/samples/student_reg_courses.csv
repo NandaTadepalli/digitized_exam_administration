@@ -1,1 +1,4 @@
-﻿student_id,course_code,academic_year,semester
+student_id,course_code,academic_year,semester,registration_type
+21ETCC001,MA101,2023-24,ODD,REGULAR
+21ETCC002,PH101,2023-24,ODD,RE-REGISTRATION
+21ETCC003,CY101,2023-24,ODD,REGULAR

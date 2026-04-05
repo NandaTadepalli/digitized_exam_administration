@@ -29,15 +29,14 @@
         <form id="searchForm" onsubmit="return false;" class="flex-center-gap-8">
             <label for="studentSearch" class="fs-1">Student ID:</label>
             <input type="text" id="studentSearch" name="studentSearch" placeholder="Enter Student ID" autocomplete="off"
-                class="search-input-custom"
-                aria-label="Student ID">
+                class="search-input-custom" aria-label="Student ID">
             <a href="#" id="searchStudentLink" class="control-btn search-btn mt-0">Search</a>
             <a href="#" id="resetStudentSearchLink" class="control-btn reset-btn reset-btn-custom">Reset</a>
         </form>
         <div id="autocomplete-list" class="autocomplete-items autocomplete-pos"></div>
     </div>
     {% endif %}
-    <div class="coursereg-actions-bar actions-bar-custom" id="courseregActionsBar">
+    <div class="coursereg-actions-bar actions-bar-custom d-none" id="courseregActionsBar">
         <div class="pagination-bar d-flex" id="courseregPaginationBar">
             <div id="coursereg-pagination"></div>
         </div>
@@ -62,12 +61,11 @@
                     <th>Course Name</th>
                     <th>Academic Year</th>
                     <th>Semester</th>
+                    <th>Registration Type</th>
                 </tr>
             </thead>
-            <tbody id="coursereg-list">
-                {% if courseregs %}
+            <tbody>
                 {% for reg in courseregs %}
-                {% if reg.student.user == user %}
                 <tr>
                     <td>{{ forloop.counter }}</td>
                     <td>{{ reg.student.student_id }}</td>
@@ -76,10 +74,13 @@
                     <td>{{ reg.course.course_name }}</td>
                     <td>{{ reg.academic_year }}</td>
                     <td>{{ reg.semester }}</td>
+                    <td>{{ reg.registration_type }}</td>
                 </tr>
-                {% endif %}
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="text-center">No courses registered yet.</td>
+                </tr>
                 {% endfor %}
-                {% endif %}
             </tbody>
         </table>
         {% if page_obj %}
@@ -123,6 +124,7 @@
                     <th>Course Name</th>
                     <th>Academic Year</th>
                     <th>Semester</th>
+                    <th>Registration Type</th>
                     {% if user.role|lower == 'admin' %}<th>Actions</th>{% endif %}
                 </tr>
             </thead>
@@ -138,4 +140,4 @@
     </div>
     {% endif %}
 </div>
-{% endblock %}
+{% endblock %}

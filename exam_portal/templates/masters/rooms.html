@@ -40,6 +40,14 @@
                 {% endfor %}
             </select>
 
+            <label for="room-type">Room Type</label>
+            <select id="room-type" name="room_type">
+                <option value="All" {% if selected_room_type|default:'All' == 'All' %}selected{% endif %}>Select Type</option>
+                {% for type in unique_room_types %}
+                <option value="{{ type }}" {% if type == selected_room_type %}selected{% endif %}>{{ type }}</option>
+                {% endfor %}
+            </select>
+
             <label for="capacity-min">Capacity Min:</label>
             <input type="number" id="capacity-min" name="capacity_min" min="0" placeholder="Min"
                 value="{{ capacity_min|default:'' }}">
@@ -104,6 +112,7 @@
                     <th>#</th>
                     <th>Room ID</th>
                     <th>Block</th>
+                    <th>Room Type</th>
                     <th>Room Capacity</th>
                     <th>Status</th>
                     <th>Actions</th>
@@ -115,6 +124,7 @@
                     <td>{{ forloop.counter0|add:page_obj.start_index }}</td>
                     <td>{{ room.room_code }}</td>
                     <td>{{ room.block }}</td>
+                    <td>{{ room.room_type|default:'' }}</td>
                     <td>{{ room.capacity }}</td>
                     <td>{% if room.is_active %}Active{% else %}Temporarily Unavailable{% endif %}</td>
                     <td>
@@ -144,6 +154,7 @@
     const roomFilterForm = document.getElementById('roomFilterForm');
     const roomSearchInput = document.getElementById('room-search');
     const roomBlockSelect = document.getElementById('room-block');
+    const roomTypeSelect = document.getElementById('room-type');
     const capacityMinInput = document.getElementById('capacity-min');
     const capacityMaxInput = document.getElementById('capacity-max');
     const roomList = document.getElementById('rooms-list');
@@ -154,9 +165,10 @@
     function fetchRoomData(page = 1) {
         const search = roomSearchInput.value;
         const block = roomBlockSelect.value;
+        const room_type = roomTypeSelect.value;
         const capacity_min = capacityMinInput.value;
         const capacity_max = capacityMaxInput.value;
-        const params = new URLSearchParams({ type: 'room', search, block, capacity_min, capacity_max, page });
+        const params = new URLSearchParams({ type: 'room', search, block, room_type, capacity_min, capacity_max, page });
         fetch('/masters/ajax/?' + params.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
             .then(r => r.json())
             .then(data => {
@@ -173,6 +185,7 @@
 
     roomSearchInput.addEventListener('input', instantRoomFilter);
     roomBlockSelect.addEventListener('change', instantRoomFilter);
+    roomTypeSelect.addEventListener('change', instantRoomFilter);
     capacityMinInput.addEventListener('input', instantRoomFilter);
     capacityMaxInput.addEventListener('input', instantRoomFilter);
 
@@ -190,6 +203,7 @@
     resetRoomBtn.addEventListener('click', function () {
         roomSearchInput.value = '';
         roomBlockSelect.value = 'All';
+        roomTypeSelect.value = 'All';
         capacityMinInput.value = '';
         capacityMaxInput.value = '';
         fetchRoomData(1);

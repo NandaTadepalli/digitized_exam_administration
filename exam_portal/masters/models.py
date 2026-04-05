@@ -90,9 +90,6 @@ class Faculty(models.Model):
 
     email = models.EmailField(max_length=100, blank=True, null=True)
 
-    @property
-    def email(self):
-        return self.user.email if self.user else None
     phone_number = models.CharField(max_length=15, blank=True, null=True)
 
     designation = models.CharField(max_length=30, choices=DESIGNATION_CHOICES, blank=True, null=True)

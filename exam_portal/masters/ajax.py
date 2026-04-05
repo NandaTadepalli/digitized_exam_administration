@@ -8,6 +8,7 @@ def ajax(request):
     data_type = request.GET.get('type')
     page_number = request.GET.get('page')
     search = request.GET.get('search', '').strip().lower()
+    
     # --- Student ID Autocomplete AJAX ---
     if data_type == 'student-id-autocomplete':
         query = request.GET.get('q', '').strip()
@@ -19,9 +20,11 @@ def ajax(request):
             for s in students[:20]
         ]
         return JsonResponse({'results': results})
+
     department = request.GET.get('department', '').strip()
     # For rooms
     block = request.GET.get('block', '').strip()
+    room_type = request.GET.get('room_type', '').strip()
     capacity_min = request.GET.get('capacity_min', '').strip()
     capacity_max = request.GET.get('capacity_max', '').strip()
     # For courses
@@ -65,6 +68,7 @@ def ajax(request):
                     <td>{escape(reg.course.course_name)}</td>
                     <td>{escape(reg.academic_year)}</td>
                     <td>{escape(reg.semester)}</td>
+                    <td>{escape(reg.registration_type)}</td>
                     <td>
                         <button class='edit-coursereg-btn' data-id='{reg.id}'>Edit</button>
                         <button class='delete-coursereg-btn' data-id='{reg.id}'>Delete</button>
@@ -81,13 +85,14 @@ def ajax(request):
                     <td>{escape(reg.course.course_name)}</td>
                     <td>{escape(reg.academic_year)}</td>
                     <td>{escape(reg.semester)}</td>
+                    <td>{escape(reg.registration_type)}</td>
                 </tr>
                 """)
         if not rows:
             if hasattr(request.user, 'role') and request.user.role.lower() == 'admin':
-                rows.append("<tr><td colspan='8'>No course registrations found.</td></tr>")
+                rows.append("<tr><td colspan='9'>No course registrations found.</td></tr>")
             else:
-                rows.append("<tr><td colspan='7'>No course registrations found.</td></tr>")
+                rows.append("<tr><td colspan='8'>No course registrations found.</td></tr>")
         table_html = "".join(rows)
         pag = page_obj
         pagination_html = render_pagination(pag)
@@ -192,8 +197,10 @@ def ajax(request):
                 models.Q(room_code__icontains=search) |
                 models.Q(block__icontains=search)
             )
-        if block and block.lower() != 'all' and block:
+        if block and block.lower() != 'all':
             queryset = queryset.filter(block=block)
+        if room_type and room_type.lower() != 'all':
+            queryset = queryset.filter(room_type=room_type)
         if capacity_min.isdigit():
             queryset = queryset.filter(capacity__gte=int(capacity_min))
         if capacity_max.isdigit():
@@ -207,6 +214,7 @@ def ajax(request):
                 <td>{idx}</td>
                 <td>{escape(room.room_code)}</td>
                 <td>{escape(room.block)}</td>
+                <td>{escape(room.room_type or '')}</td>
                 <td>{escape(room.capacity)}</td>
                 <td>{'Active' if room.is_active else 'Temporarily Unavailable'}</td>
                 <td>

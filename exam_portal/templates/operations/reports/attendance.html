@@ -1,0 +1,120 @@
+{% extends "core/base_admin.html" %}
+{% load static %}
+
+{% block content %}
+<style>
+    .report-table { width: 100%; border-collapse: collapse; margin-top: 20px; table-layout: auto; }
+    .report-table th, .report-table td { padding: 12px; border: 1px solid #cbd5e1; text-align: left; }
+    .report-table th { background: #f1f5f9; font-weight: 600; color: #1E3A5F; }
+    .filter-box { margin-top: 20px; padding: 20px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; }
+    .filter-form { display: flex; align-items: flex-end; gap: 15px; flex-wrap: wrap; }
+    
+    .stats-container { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 20px; }
+    .stat-card { padding: 15px; border-radius: 10px; background: #fff; border: 1px solid #e2e8f0; text-align: center; }
+    .stat-value { font-size: 1.5rem; font-weight: 700; color: #1E3A5F; display: block; }
+    .stat-label { font-size: 0.8rem; color: #64748b; text-transform: uppercase; }
+    
+    .status-badge { padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+    .status-present { background: #dcfce7; color: #166534; }
+    .status-absent { background: #fee2e2; color: #991b1b; }
+    .status-unmarked { background: #f1f5f9; color: #64748b; border: 1px dashed #cbd5e1; }
+</style>
+
+<div class="pages-main">
+    <div class="pages-main-head">Attendance Report</div>
+    <div class="pages-main-subhead">Reconciliation of student attendance against faculty assignments</div>
+
+    <div class="filter-box">
+        <form method="GET" action="" class="filter-form">
+            <div style="flex: 1; min-width: 250px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 600;">Select Examination</label>
+                <select name="exam_id" class="form-control" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                    <option value="">-- Choose Examination --</option>
+                    {% for e in exams %}
+                    <option value="{{ e.id }}" {% if e.id|slugify == selected_exam_id|slugify %}selected{% endif %}>
+                        {{ e.exam_name }} ({{ e.academic_year }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="control-btn" style="padding: 10px 25px; height: 45px; border: none; background: #1E3A5F; color: #fff; cursor: pointer;">Generate Report</button>
+        </form>
+    </div>
+
+    {% if exam %}
+    <div class="stats-container">
+        <div class="stat-card">
+            <span class="stat-value">{{ stats.total }}</span>
+            <span class="stat-label">Total Registered</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-value" style="color: #166534;">{{ stats.present }}</span>
+            <span class="stat-label">Present</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-value" style="color: #991b1b;">{{ stats.absent }}</span>
+            <span class="stat-label">Absent</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-value" style="color: #64748b;">{{ stats.unmarked }}</span>
+            <span class="stat-label">Not Marked</span>
+        </div>
+    </div>
+
+    <div class="table">
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th>Student ID</th>
+                    <th>Name</th>
+                    <th>Slot & Room</th>
+                    <th>Assigned Faculty</th>
+                    <th>Marked By</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in report_data %}
+                <tr>
+                    <td>{{ item.student.student_id }}</td>
+                    <td>{{ item.student.student_name|default:"N/A" }}</td>
+                    <td>{{ item.slot.slot_code }} | <strong>{{ item.room.room_code }}</strong></td>
+                    <td>
+                        {% if item.assigned_to %}
+                        <span style="font-size: 0.85rem; color: #1E3A5F;">{{ item.assigned_to.faculty_name }}</span>
+                        {% else %}
+                        <span style="color: #94a3b8; font-style: italic;">No allocation</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if item.marked_by %}
+                        <span style="font-size: 0.85rem; color: #166534;">{{ item.marked_by.faculty_name }}</span>
+                        <div style="font-size: 0.7rem; color: #94a3b8; margin-top: 2px;">{{ item.time|date:"d/m H:i" }}</div>
+                        {% else %}
+                        <span style="color: #94a3b8; font-style: italic;">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="status-badge 
+                            {% if item.status == 'PRESENT' %}status-present
+                            {% elif item.status == 'ABSENT' %}status-absent
+                            {% else %}status-unmarked{% endif %}">
+                            {{ item.status }}
+                        </span>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" style="padding: 40px; text-align: center; color: #94a3b8;">No attendance data found for this exam.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 80px 20px; color: #64748b; background: #fff; border-radius: 12px; margin-top: 20px; border: 1px dashed #cbd5e1;">
+        <h3>Please select an examination to view the attendance report</h3>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

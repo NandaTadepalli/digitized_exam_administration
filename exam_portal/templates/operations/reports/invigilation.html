@@ -1,0 +1,69 @@
+{% extends "core/base_admin.html" %}
+{% load static %}
+
+{% block content %}
+<style>
+    .report-table { width: 100%; border-collapse: collapse; margin-top: 30px; table-layout: auto; }
+    .report-table th, .report-table td { padding: 12px; border: 1px solid #cbd5e1; text-align: left; }
+    .report-table th { background: #f1f5f9; font-weight: 600; color: #1E3A5F; }
+    .filter-box { margin-top: 20px; padding: 20px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; }
+    .filter-form { display: flex; align-items: flex-end; gap: 15px; flex-wrap: wrap; }
+</style>
+
+<div class="pages-main">
+    <div class="pages-main-head">Invigilation Chart</div>
+    <div class="pages-main-subhead">Faculty assignments per exam slot and room</div>
+
+    <div class="filter-box">
+        <form method="GET" action="" class="filter-form">
+            <div style="flex: 1; min-width: 250px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 600;">Select Examination</label>
+                <select name="exam_id" class="form-control" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                    <option value="">-- Choose Examination --</option>
+                    {% for e in exams %}
+                    <option value="{{ e.id }}" {% if e.id|slugify == selected_exam_id|slugify %}selected{% endif %}>
+                        {{ e.exam_name }} ({{ e.academic_year }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="control-btn" style="padding: 10px 25px; height: 45px; border: none; background: #1E3A5F; color: #fff; cursor: pointer;">Generate Chart</button>
+        </form>
+    </div>
+
+    {% if exam %}
+    <div class="table">
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th>Date & Slot</th>
+                    <th>Room</th>
+                    <th>Faculty ID</th>
+                    <th>Faculty Name</th>
+                    <th>Department</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in report_data %}
+                <tr>
+                    <td>{{ item.exam_slot.exam_date|date:"d M Y" }} ({{ item.exam_slot.slot_code }})</td>
+                    <td><strong>{{ item.room.room_code }}</strong></td>
+                    <td>{{ item.faculty.faculty_id }}</td>
+                    <td>{{ item.faculty.faculty_name }}</td>
+                    <td>{{ item.faculty.department.dept_name|default:"N/A" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" style="padding: 40px; text-align: center; color: #94a3b8;">No invigilation duties found for this exam.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 80px 20px; color: #64748b; background: #fff; border-radius: 12px; margin-top: 20px; border: 1px dashed #cbd5e1;">
+        <h3>Please select an examination to view the invigilation chart</h3>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

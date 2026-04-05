@@ -156,45 +156,44 @@
     </div>
     <div id="examination-table-container">
         <table id="examination-table" class="styled-table">
-            <!-- Publish Button (conditionally rendered) -->
-            <div id="publishExamWrapper" class="publish-exam-wrapper">
-                <a href="#" class="publish-exam-btn action-link publish-exam-btn-style" id="publishExamBtn">Publish
-                    Exam</a>
-            </div>
-            <!-- Delete Examination Modal -->
-            <div id="deleteExamModal" class="modal modal-z-1000 modal-backdrop-black-4">
-                <div class="modal-content-base">
-                    <span id="closeDeleteExamModal" class="close-modal-x">&times;</span>
-                    <h2 class="mt-0">Confirm Deletion</h2>
-                    <div id="deleteExamWarning" class="warning-text-red"></div>
-                    <form id="deleteExamForm">
-                        {% csrf_token %}
-                        <input type="hidden" id="deleteExamId" name="exam_id">
-                        <div id="deleteExamDetails" class="mb-1em"></div>
-                        <a href="#" id="confirmDeleteExamLink" class="action-link">Delete</a>
-                        <a href="#" id="cancelDeleteExamBtn" class="action-link">Cancel</a>
-                    </form>
-                </div>
-            </div>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Exam</th>
+                    <th>Academic Year</th>
+                    <th>Semester</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
+                    <th>Slots</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Data will be loaded by JS -->
+            </tbody>
         </table>
     </div>
-    <thead>
-        <tr>
-            <th>#</th>
-            <th>Exam</th>
-            <th>Academic Year</th>
-            <th>Semester</th>
-            <th>Start Date</th>
-            <th>End Date</th>
-            <th>Slots</th>
-            <th>Status</th>
-            <th>Action</th>
-        </tr>
-    </thead>
-    <tbody>
-        <!-- Data will be loaded by JS -->
-    </tbody>
-    </table>
+    <!-- Publish Button (conditionally rendered) -->
+    <div id="publishExamWrapper" class="publish-exam-wrapper">
+        <a href="#" class="publish-exam-btn action-link publish-exam-btn-style" id="publishExamBtn">Publish
+            Exam</a>
+    </div>
+    <!-- Delete Examination Modal -->
+    <div id="deleteExamModal" class="modal modal-z-1000 modal-backdrop-black-4">
+        <div class="modal-content-base">
+            <span id="closeDeleteExamModal" class="close-modal-x">&times;</span>
+            <h2 class="mt-0">Confirm Deletion</h2>
+            <div id="deleteExamWarning" class="warning-text-red"></div>
+            <form id="deleteExamForm">
+                {% csrf_token %}
+                <input type="hidden" id="deleteExamId" name="exam_id">
+                <div id="deleteExamDetails" class="mb-1em"></div>
+                <a href="#" id="confirmDeleteExamLink" class="action-link">Delete</a>
+                <a href="#" id="cancelDeleteExamBtn" class="action-link">Cancel</a>
+            </form>
+        </div>
+    </div>
     <div id="examination-pagination" class="pagination"></div>
 </div>
 </div>

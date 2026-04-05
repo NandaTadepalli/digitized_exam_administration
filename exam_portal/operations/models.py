@@ -98,6 +98,7 @@ class ExamSlot(models.Model):
     start_time = models.TimeField()
     end_time = models.TimeField()
     slot_code = models.CharField(max_length=10, null=True)
+    registration_type = models.CharField(max_length=20, default="REGULAR")
 
     status = models.CharField(
         max_length=10,
@@ -234,3 +235,6 @@ class Attendance(models.Model):
 
     class Meta:
         db_table = "attendance"
+
+    def __str__(self):
+        return f"Attendance Record {self.id}"

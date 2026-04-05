@@ -7,26 +7,33 @@ def login_view(request):
         username = request.POST.get("username")
         password = request.POST.get("password")
 
-        user = authenticate(request, username=username, password=password)
+        try:
+            user = authenticate(request, username=username, password=password)
 
-        if user is not None:
-            login(request, user)
-            # Redirect based on user role
-            if hasattr(user, 'role'):
-                if user.role == 'admin':
-                    return redirect('/dashboard/')
-                elif user.role == 'faculty':
-                    return redirect('/faculty/dashboard/')
-                elif user.role == 'student':
-                    return redirect('/student/dashboard/')
-                elif user.role == 'hod':
-                    return redirect('/hod/dashboard/')
-                elif user.role == 'dept_exam_controller':
-                    return redirect('/dec/dashboard/')
-            # Default fallback
-            return redirect('/dashboard/')
-        else:
-            messages.error(request, "Invalid username or password")
+            if user is not None:
+                login(request, user)
+                # Redirect based on user role
+                if hasattr(user, 'role'):
+                    if user.role == 'admin':
+                        return redirect('/dashboard/')
+                    elif user.role == 'faculty':
+                        return redirect('/faculty/dashboard/')
+                    elif user.role == 'student':
+                        return redirect('/student/dashboard/')
+                    elif user.role == 'hod':
+                        return redirect('/hod/dashboard/')
+                    elif user.role == 'dept_exam_controller':
+                        return redirect('/dec/dashboard/')
+                # Default fallback
+                return redirect('/dashboard/')
+            else:
+                messages.error(request, "Invalid username or password")
+        except Exception as e:
+            # Handle database errors or other issues gracefully
+            import logging
+            logging.error(f"Login error: {str(e)}")
+            messages.error(request, "An error occurred during login. Please try again later.")
+            return render(request, "accounts/login.html")
 
     return render(request, "accounts/login.html")
 

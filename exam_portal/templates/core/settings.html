@@ -87,6 +87,7 @@
                         <img src="https://img.icons8.com/?size=100&id=83159&format=png&color=000000" alt="download"> Sample CSV
                     </a>
                 </div>
+            </div>
             <!-- Modal structure for Users -->
             <div id="usersModal" class="modal-popup modal-overlay-flex">
                 <div class="modal-content modal-content-90">
@@ -119,7 +120,8 @@
             <script>
             // Modal open/close logic
             document.querySelectorAll('.view-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
                     const modalId = this.getAttribute('data-modal');
                     const modal = document.getElementById(modalId);
                     if (modalId === 'usersModal') {
@@ -159,7 +161,6 @@
                 });
             });
             </script>
-            </div>
         </div>
     </div>
 {% endblock %}

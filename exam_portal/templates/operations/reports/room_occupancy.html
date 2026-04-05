@@ -1,0 +1,98 @@
+{% extends "core/base_admin.html" %}
+{% load static %}
+
+{% block content %}
+<style>
+    /* CSS Classes and Variables for a clean, linter-friendly UI */
+    .util-high { background-color: #ef4444 !important; color: #ef4444 !important; }
+    .util-med { background-color: #f59e0b !important; color: #f59e0b !important; }
+    .util-low { background-color: #10b981 !important; color: #10b981 !important; }
+    
+    .progress-container { flex: 1; height: 10px; background: #e2e8f0; border-radius: 5px; overflow: hidden; }
+    
+    /* Using a CSS variable for the width to avoid IDE syntax highlighting issues with Django tags in style properties */
+    .progress-bar { 
+        height: 100%; 
+        transition: width 0.3s ease; 
+        width: var(--progress-width, 0%);
+    }
+    
+    .util-text { font-weight: 700; min-width: 45px; }
+
+    .report-table { width: 100%; border-collapse: collapse; margin-top: 30px; table-layout: auto; }
+    .report-table th, .report-table td { padding: 12px; border: 1px solid #cbd5e1; text-align: left; }
+    .report-table th { background: #f1f5f9; font-weight: 600; color: #1E3A5F; }
+    
+    .filter-box { margin-top: 20px; padding: 20px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; }
+    .filter-form { display: flex; align-items: flex-end; gap: 15px; flex-wrap: wrap; }
+    .select-label { display: block; margin-bottom: 8px; font-weight: 600; color: #1E3A5F; }
+    .select-input { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; }
+</style>
+
+<div class="pages-main">
+    <div class="pages-main-head">Room Occupancy Summary</div>
+    <div class="pages-main-subhead">Visual utilization report for exam halls</div>
+
+    <!-- Filters Section -->
+    <div class="filter-box">
+        <form method="GET" action="" class="filter-form">
+            <div style="flex: 1; min-width: 250px;">
+                <label class="select-label">Select Examination</label>
+                <select name="exam_id" class="select-input">
+                    <option value="">-- Choose Examination --</option>
+                    {% for e in exams %}
+                    <option value="{{ e.id }}" {% if e.id|slugify == selected_exam_id|slugify %}selected{% endif %}>
+                        {{ e.exam_name }} ({{ e.academic_year }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="control-btn" style="padding: 10px 25px; height: 45px; border: none; background: #1E3A5F; color: #fff; cursor: pointer;">Generate Report</button>
+            <a href="{% url 'operations:report_room_occupancy' %}" class="control-btn" style="padding: 10px 25px; height: 45px; background: #64748b; color: #fff; text-decoration: none; display: flex; align-items: center; justify-content: center; border-radius: 6px;">Reset</a>
+        </form>
+    </div>
+
+    {% if exam %}
+    <div class="table">
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th style="width: 20%;">Slot Info</th>
+                    <th style="width: 15%;">Room</th>
+                    <th style="width: 15%;">Capacity</th>
+                    <th style="width: 15%;">Seated</th>
+                    <th style="width: 35%;">Utilization</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in report_data %}
+                <tr>
+                    <td>{{ item.slot.exam_date|date:"d M" }} ({{ item.slot.slot_code }})</td>
+                    <td><strong>{{ item.room.room_code }}</strong></td>
+                    <td>{{ item.capacity }}</td>
+                    <td>{{ item.seated }}</td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div class="progress-container">
+                                <!-- Line 61 fix: Using CSS Variable to satisfy linter constraints on Template Tag placement -->
+                                <div class="progress-bar util-{{ item.util_status }}" style="--progress-width: {{ item.utilization }}%;"></div>
+                            </div>
+                            <span class="util-text util-{{ item.util_status }}">{{ item.utilization }}%</span>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" style="padding: 40px; text-align: center; color: #94a3b8;">No occupancy data found for this exam.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 80px 20px; color: #64748b; background: #fff; border-radius: 12px; margin-top: 20px; border: 1px dashed #cbd5e1;">
+        <h3>Please select an examination to view the occupancy report</h3>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

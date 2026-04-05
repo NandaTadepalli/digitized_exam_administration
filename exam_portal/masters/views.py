@@ -197,177 +197,115 @@ def facultyview_seatingplan(request):
 def batch_list(request):
     batches = Batch.objects.all()
     return render(request, "masters/batch_list.html", {"batches": batches})
-# ===== BATCH CSV UPLOAD =====
 @login_required
 def batch_upload(request):
     if request.method == "POST" and request.FILES.get("csv_file"):
         from io import TextIOWrapper
         import csv
+        import collections
         import unicodedata
         import re
         from .models import Batch
 
         csv_file = request.FILES["csv_file"]
         success_count = 0
+        error_groups = collections.defaultdict(list)
 
         try:
             decoded_file = TextIOWrapper(csv_file.file, encoding="utf-8")
             reader = csv.DictReader(decoded_file)
 
             if not reader.fieldnames:
-                messages.error(
-                    request,
-                    "CSV header error: Expected headers ['batch_code', 'admission_year', 'grad_year'].",
-                )
+                messages.error(request, "CSV file is missing headers.")
                 return redirect("core:settings")
 
             def normalize(val):
-                if not val:
-                    return ""
+                if not val: return ""
                 val = unicodedata.normalize("NFKC", val)
-                val = re.sub(r"[\s\u00A0\u200B\u200C\u200D\uFEFF]+", " ", val)
-                val = val.strip().lower()
-                return val
+                val = re.sub(r"[\s\u00A0\u200B\u200C\u200D\ufeff]+", " ", val)
+                return val.strip().lower()
 
-            # Normalize headers to handle BOM, whitespace, and case
-            def norm_header(h):
-                if not h:
-                    return ""
-                h = unicodedata.normalize("NFKC", h)
-                h = re.sub(r"[\s\u00A0\u200B\u200C\u200D\uFEFF]+", "", h)
-                h = h.strip().lower()
-                return h
+            f_map = {k.strip().lower(): k for k in reader.fieldnames}
+            code_key = f_map.get("batch_code") or f_map.get("regulation")
+            adm_key = f_map.get("admission_year")
+            grad_key = f_map.get("grad_year")
+            status_key = f_map.get("status")
 
-            norm_field_map = {norm_header(k): k for k in reader.fieldnames}
-            required_fields = ["batch_code", "admission_year", "grad_year"]
-            missing_fields = [f for f in required_fields if f not in norm_field_map]
-
-            if missing_fields:
-                messages.error(
-                    request,
-                    f"CSV header error: Expected headers {required_fields}.",
-                )
+            if not all([code_key, adm_key, grad_key]):
+                messages.error(request, "CSV missing required columns: batch_code, admission_year, grad_year.")
                 return redirect("core:settings")
 
-            code_key = norm_field_map.get("batch_code") or norm_field_map.get(
-                "regulation"
-            )
-            admission_key = norm_field_map.get("admission_year")
-            grad_key = norm_field_map.get("grad_year")
-            status_key = norm_field_map.get("status")
-
-            # --- First pass: validate rows & collect data ---
-            valid_rows = []  # each: dict with row_num, batch_code, admission_year, grad_year, status, code_norm
-
+            valid_rows = []
             for i, row in enumerate(reader, start=2):
-                batch_code = row.get(code_key) if code_key else None
-                admission_year = row.get(admission_key) if admission_key else None
-                grad_year = row.get(grad_key) if grad_key else None
-                status = row.get(status_key) if status_key else "ACTIVE"
+                code = (row.get(code_key) or "").strip()
+                adm = (row.get(adm_key) or "").strip()
+                grad = (row.get(grad_key) or "").strip()
+                stat = (row.get(status_key) or "ACTIVE").strip()
 
-                row_has_error = False
-
-                if not batch_code:
-                    messages.error(
-                        request,
-                        f"CSV format error: batch_code/regulation cannot be empty. (Row {i})",
-                    )
-                    row_has_error = True
-                if not admission_year:
-                    messages.error(
-                        request,
-                        f"CSV format error: admission_year cannot be empty. (Row {i})",
-                    )
-                    row_has_error = True
-                if not grad_year:
-                    messages.error(
-                        request,
-                        f"CSV format error: grad_year cannot be empty. (Row {i})",
-                    )
-                    row_has_error = True
-
-                if row_has_error:
+                if not code or not adm or not grad:
+                    error_groups["Missing required fields (batch_code, adm_year, or grad_year)"].append(i)
                     continue
 
-                valid_rows.append(
-                    {
-                        "row_num": i,
-                        "batch_code": batch_code,
-                        "admission_year": admission_year,
-                        "grad_year": grad_year,
-                        "status": status,
-                        "code_norm": normalize(batch_code),
-                    }
-                )
+                valid_rows.append({
+                    "row_num": i,
+                    "code": code,
+                    "adm": adm,
+                    "grad": grad,
+                    "status": stat,
+                    "code_norm": normalize(code)
+                })
 
             if not valid_rows:
+                if error_groups:
+                    for msg, rows in error_groups.items():
+                        messages.error(request, f"Rows {', '.join(map(str, sorted(rows)))}: {msg}")
                 return redirect("core:settings")
 
-            # --- Bulk fetch existing batches ---
-            batch_codes = {r["batch_code"] for r in valid_rows}
-            existing_batches = Batch.objects.filter(batch_code__in=batch_codes)
-
-            # Map by normalized batch_code to mimic __iexact + normalize()
-            existing_map = {normalize(b.batch_code): b for b in existing_batches}
+            # Bulk fetch
+            codes = {r["code"] for r in valid_rows}
+            existing_map = {normalize(b.batch_code): b for b in Batch.objects.filter(batch_code__in=codes)}
 
             new_batches = []
-
-            # --- Decide existing vs new; show warnings; prepare bulk_create ---
             for data in valid_rows:
-                row_num = data["row_num"]
-                batch_code = data["batch_code"]
-                admission_year = data["admission_year"]
-                grad_year = data["grad_year"]
-                status = data["status"]
-                code_norm = data["code_norm"]
-
-                existing = existing_map.get(code_norm)
-
+                existing = existing_map.get(data["code_norm"])
                 if existing:
                     diffs = []
-                    if str(existing.admission_year) != str(admission_year):
-                        diffs.append(
-                            ("Admission Year", existing.admission_year, admission_year)
-                        )
-                    if str(existing.grad_year) != str(grad_year):
-                        diffs.append(("Grad Year", existing.grad_year, grad_year))
-                    if existing.status != status:
-                        diffs.append(("Status", existing.status, status))
+                    if str(existing.admission_year) != str(data["adm"]):
+                        diffs.append(("Admission", existing.admission_year, data["adm"]))
+                    if str(existing.grad_year) != str(data["grad"]):
+                        diffs.append(("Graduation", existing.grad_year, data["grad"]))
+                    if existing.status != data["status"]:
+                        diffs.append(("Status", existing.status, data["status"]))
 
                     if not diffs:
-                        messages.warning(
-                            request, f"Batch '{batch_code}' already exists."
-                        )
+                        error_groups[f"Batch '{data['code']}' already exists."].append(data["row_num"])
                     else:
-                        messages.warning(
-                            request,
-                            f"Batch '{batch_code}' exists with differences: {diffs}",
-                        )
+                        messages.warning(request, f"Row {data['row_num']}: Batch '{data['code']}' exists with differences: {diffs}")
                 else:
-                    # New batch → bulk_create later
-                    new_batches.append(
-                        Batch(
-                            batch_code=batch_code,
-                            admission_year=admission_year,
-                            grad_year=grad_year,
-                            status=status,
-                        )
-                    )
+                    new_batches.append(Batch(
+                        batch_code=data["code"],
+                        admission_year=data["adm"],
+                        grad_year=data["grad"],
+                        status=data["status"]
+                    ))
 
-            # --- Bulk insert new batches ---
             if new_batches:
                 Batch.objects.bulk_create(new_batches, batch_size=1000)
                 success_count = len(new_batches)
 
             if success_count:
-                messages.success(
-                    request, f"{success_count} batch(es) imported successfully."
-                )
+                messages.success(request, f"{success_count} batches uploaded successfully.")
+
+            if error_groups:
+                for msg, rows in error_groups.items():
+                    messages.warning(request, f"Rows {', '.join(map(str, sorted(rows)))}: {msg}")
 
         except Exception as e:
-            messages.error(request, f"Error processing file: {e}")
+            messages.error(request, f"Error processing CSV: {e}")
 
-        return redirect("core:settings")
+    else:
+        messages.error(request, "No file uploaded.")
+    return redirect("core:settings")
 
     messages.error(request, "No file uploaded.")
     return redirect("core:settings")
@@ -412,6 +350,106 @@ def coursereg_conflict_resolve(request):
         if 'coursereg_conflicts' in request.session:
             del request.session['coursereg_conflicts']
         return redirect('masters:coursereg')
+
+
+
+@login_required
+def course_upload(request):
+    if request.method == "POST" and request.FILES.get("csv_file"):
+        from io import TextIOWrapper
+        import csv
+        import collections
+        import re
+        from .models import Course, Department
+
+        csv_file = request.FILES["csv_file"]
+        success_count = 0
+        error_groups = collections.defaultdict(list)
+
+        try:
+            decoded_file = TextIOWrapper(csv_file.file, encoding="utf-8")
+            
+            # Use sniffer for robust delimiter detection
+            sample = decoded_file.read(2048)
+            decoded_file.seek(0)
+            try:
+                dialect = csv.Sniffer().sniff(sample, delimiters=",;\t")
+                reader = csv.DictReader(decoded_file, dialect=dialect)
+            except Exception:
+                reader = csv.DictReader(decoded_file)
+
+            if not reader.fieldnames:
+                messages.error(request, "CSV file is missing headers.")
+                return redirect("masters:courses")
+
+            # Improved normalization to handle BOM and invisible characters
+            import unicodedata
+            def normalize(s):
+                if not s: return ""
+                s = unicodedata.normalize("NFKC", s)
+                return re.sub(r'[^a-zA-Z0-9]', '', s).lower()
+
+            f_map = {normalize(k): k for k in reader.fieldnames}
+
+            # Map the required columns
+            code_col = f_map.get(normalize("coursecode")) or f_map.get(normalize("course_code"))
+            name_col = f_map.get(normalize("coursename")) or f_map.get(normalize("course_name"))
+
+            if not code_col or not name_col:
+                messages.error(request, "CSV must have 'course_code' and 'course_name' columns.")
+                return redirect("masters:courses")
+
+            valid_rows = []
+            for i, row in enumerate(reader, start=2):
+                code = (row.get(code_col) or "").strip()
+                name = (row.get(name_col) or "").strip()
+
+                if not code or not name:
+                    error_groups["Missing course_code or course_name"].append(i)
+                    continue
+                
+                valid_rows.append({"i": i, "code": code, "name": name})
+
+            if not valid_rows:
+                if error_groups:
+                    for msg, rows in error_groups.items():
+                        messages.warning(request, f"Rows {', '.join(map(str, sorted(rows)))}: {msg}")
+                return redirect("masters:courses")
+
+            # Bulk fetch existing courses
+            codes_set = {r["code"].lower() for r in valid_rows}
+            existing_objs = Course.objects.filter(course_code__in=codes_set)
+            existing_map = {c.course_code.lower(): c for c in existing_objs}
+
+            new_courses = []
+            for r in valid_rows:
+                if r["code"].lower() in existing_map:
+                    error_groups[f"Course '{r['code']}' already exists."].append(r["i"])
+                    continue
+                
+                new_courses.append(Course(
+                    course_code=r["code"],
+                    course_name=r["name"]
+                ))
+
+            if new_courses:
+                Course.objects.bulk_create(new_courses, batch_size=1000)
+                success_count = len(new_courses)
+
+            if success_count:
+                messages.success(request, f"{success_count} courses uploaded successfully.")
+
+            if error_groups:
+                for msg, rows in error_groups.items():
+                    messages.warning(request, f"Rows {', '.join(map(str, sorted(rows)))}: {msg}")
+
+        except Exception as e:
+            messages.error(request, f"Error processing CSV: {e}")
+    else:
+        messages.error(request, "Please upload a CSV file.")
+    return redirect("masters:courses")
+
+
 # ===== FACULTY CSV UPLOAD =====
 @login_required
 def faculty_upload(request):
@@ -420,11 +458,13 @@ def faculty_upload(request):
         import csv
         import unicodedata
         import re
+        import collections
         from .models import Department, Faculty
         from accounts.models import User
 
         csv_file = request.FILES["csv_file"]
         success_count = 0
+        error_groups = collections.defaultdict(list)
 
         try:
             decoded_file = TextIOWrapper(csv_file.file, encoding="utf-8")
@@ -487,27 +527,19 @@ def faculty_upload(request):
                 row_has_error = False
 
                 if not faculty_id:
-                    messages.error(
-                        request, f"Row {i}: faculty_id is missing in the CSV."
-                    )
+                    error_groups["faculty_id is missing in the CSV."].append(i)
                     row_has_error = True
 
                 # Department validation using lookup
                 if not dept_name:
-                    messages.error(
-                        request,
-                        f"Row {i}: Department name is missing in the CSV.",
-                    )
+                    error_groups["Department name is missing in the CSV."].append(i)
                     row_has_error = True
                     dept = None
                 else:
                     norm_dept_name = normalize(dept_name)
                     dept = dept_lookup.get(norm_dept_name)
                     if not dept:
-                        messages.error(
-                            request,
-                            f"Row {i}: Department '{dept_name}' not found.",
-                        )
+                        error_groups[f"Department '{dept_name}' not found."].append(i)
                         row_has_error = True
 
                 if row_has_error or not faculty_id:
@@ -538,20 +570,22 @@ def faculty_upload(request):
             missing_user_ids = sorted(faculty_ids - set(users_map.keys()))
             if missing_user_ids:
                 for fid in missing_user_ids:
-                    for row_num in id_to_rownums.get(fid, []):
-                        messages.error(
-                            request,
-                            f"Row {row_num}: User with faculty_id '{fid}' not found.",
-                        )
-                        messages.error(
-                            request,
-                            f"Row {row_num}:'{fid}' is not linked to any user.",
-                        )
+                    rows_str = ", ".join(map(str, id_to_rownums.get(fid, [])))
+                    error_groups[f"User with faculty_id '{fid}' not found (Not linked to any user)."].append(f"Rows {rows_str}")
+                
                 # keep only rows which have a User
                 valid_rows = [
                     r for r in valid_rows if r["faculty_id"] in users_map
                 ]
                 if not valid_rows:
+                    # Report what we have so far
+                    if error_groups:
+                        for msg, identifiers in error_groups.items():
+                            if isinstance(identifiers[0], int):
+                                rows_str = ", ".join(map(str, sorted(identifiers)))
+                                messages.error(request, f"Rows {rows_str}: {msg}")
+                            else:
+                                messages.error(request, msg)
                     return redirect("masters:faculty")
 
             # --- Bulk fetch existing Faculty records ---
@@ -579,65 +613,27 @@ def faculty_upload(request):
                 if not name:
                     name = f"{user.first_name} {user.last_name}".strip()
 
-                if not name:
-                    messages.error(
-                        request,
-                        f"Row {row_num}:'{faculty_id}' is not linked to any user.",
-                    )
-                    continue
-
                 if faculty_id in existing_faculty_map:
                     faculty = existing_faculty_map[faculty_id]
                     diffs = []
 
                     if faculty.faculty_name != name:
                         diffs.append(("Name", faculty.faculty_name, name))
-
                     if faculty.email != user.email:
                         diffs.append(("Email", faculty.email, user.email))
-
                     if faculty.phone_number != phone_number:
-                        diffs.append(
-                            (
-                                "Phone Number",
-                                faculty.phone_number,
-                                phone_number,
-                            )
-                        )
-
+                        diffs.append(("Phone Number", faculty.phone_number, phone_number))
                     if faculty.dept != dept:
-                        diffs.append(
-                            (
-                                "Department",
-                                faculty.dept.dept_name
-                                if faculty.dept
-                                else "",
-                                dept.dept_name if dept else "",
-                            )
-                        )
-
+                        diffs.append(("Department", faculty.dept.dept_name if faculty.dept else "", dept.dept_name if dept else ""))
                     if faculty.status != status:
                         diffs.append(("Status", faculty.status, status))
-
-                    # Only compare designation if one was provided in CSV
                     if designation and faculty.designation != designation:
-                        diffs.append(
-                            (
-                                "Designation",
-                                faculty.designation,
-                                designation,
-                            )
-                        )
+                        diffs.append(("Designation", faculty.designation, designation))
 
                     if not diffs:
-                        messages.warning(
-                            request,
-                            f"Faculty with ID '{faculty_id}' already exists.",
-                        )
+                        error_groups[f"Faculty with ID '{faculty_id}' already exists."].append(row_num)
                     else:
-                        mismatches.append(
-                            {"faculty_id": faculty_id, "diffs": diffs}
-                        )
+                        mismatches.append({"faculty_id": faculty_id, "diffs": diffs})
                 else:
                     # New Faculty → collect for bulk_create
                     new_faculty_objects.append(
@@ -652,6 +648,15 @@ def faculty_upload(request):
                             email=user.email,
                         )
                     )
+
+            # Report all grouped messages
+            if error_groups:
+                for msg, identifiers in error_groups.items():
+                    if isinstance(identifiers[0], int):
+                        rows_str = ", ".join(map(str, sorted(identifiers)))
+                        messages.warning(request, f"Rows {rows_str}: {msg}")
+                    else:
+                        messages.warning(request, msg)
 
             # Bulk create new faculty
             if new_faculty_objects:
@@ -921,9 +926,11 @@ from django.shortcuts import redirect
 def rooms(request):
     from django.core.paginator import Paginator
     unique_blocks = Room.objects.values_list('block', flat=True).distinct()
+    unique_room_types = Room.objects.values_list('room_type', flat=True).exclude(room_type__isnull=True).exclude(room_type='').distinct()
     rooms = Room.objects.all().order_by('room_code')
     search = request.GET.get('search', '').strip().lower()
     block = request.GET.get('block', '').strip()
+    room_type = request.GET.get('room_type', '').strip()
     capacity_min = request.GET.get('capacity_min', '').strip()
     capacity_max = request.GET.get('capacity_max', '').strip()
     if search:
@@ -931,8 +938,10 @@ def rooms(request):
             models.Q(room_code__icontains=search) |
             models.Q(block__icontains=search)
         )
-    if block and block.lower() != 'all' and block:
+    if block and block.lower() != 'all':
         rooms = rooms.filter(block=block)
+    if room_type and room_type.lower() != 'all':
+        rooms = rooms.filter(room_type=room_type)
     if capacity_min.isdigit():
         rooms = rooms.filter(capacity__gte=int(capacity_min))
     if capacity_max.isdigit():
@@ -943,150 +952,14 @@ def rooms(request):
     return render(request, "masters/rooms.html", {
         "page_obj": page_obj,
         "unique_blocks": unique_blocks,
+        "unique_room_types": unique_room_types,
         "search": search,
         "selected_block": block,
+        "selected_room_type": room_type,
         "capacity_min": capacity_min,
         "capacity_max": capacity_max,
     })
 
-# CSV upload view
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
-from django.utils.datastructures import MultiValueDictKeyError
-
-@login_required
-def room_upload(request):
-    if request.method == "POST" and request.FILES.get("csv_file"):
-        csv_file = request.FILES["csv_file"]
-        errors = []
-        success_count = 0
-        try:
-            decoded_file = TextIOWrapper(csv_file.file, encoding='utf-8')
-            reader = csv.DictReader(decoded_file)
-            # DEBUG: Log CSV headers and field_map
-            messages.error(request, f"DEBUG: CSV headers={reader.fieldnames}")
-            field_map = {k.strip().lower(): k for k in reader.fieldnames}
-            messages.error(request, f"DEBUG: field_map={field_map}")
-            def normalize(val):
-                if not val:
-                    return ""
-                val = unicodedata.normalize("NFKC", val)
-                val = re.sub(r"[\s\u00A0\u200B\u200C\u200D\uFEFF]+", " ", val)  # Remove all unicode whitespace/invisible
-                val = val.strip().lower()
-                return val
-
-            # Build lookup dictionaries for departments and programs
-            from .models import Department, Program
-            from accounts.models import User
-            dept_lookup = {normalize(d.dept_name): d for d in Department.objects.all()}
-            # Match program_code instead of program_name
-            program_lookup = {normalize(p.program_code): p for p in Program.objects.all()}
-
-            # Fix: strip whitespace from all field_map values for robust lookup
-            field_map = {k.strip().lower(): v.strip() for k, v in field_map.items()}
-            dept_key = field_map.get("dept_name") or field_map.get("department")
-            # Find the actual key in the CSV header for 'program' (with or without spaces)
-            program_key = None
-            for k in reader.fieldnames:
-                if k.strip().lower() in ("program", "program_name"):
-                    program_key = k
-                    break
-            # Find all possible program keys in the row (case-insensitive, strip spaces)
-            possible_program_keys = [k for k in reader.fieldnames if k.strip().lower() in ("program", "program_name")]
-            mismatches = []
-            for i, row in enumerate(reader, start=2):
-                student_id = row.get(field_map.get("student_id"))
-                phone_number = row.get(field_map.get("phone_number"))
-                parent_phone_number = row.get(field_map.get("parent_phone_number"))
-                dept_name = row.get(dept_key)
-                possible_program_keys = [k for k in row.keys() if k.strip().lower() in ("program", "program_name")]
-                program_name = None
-                for k in possible_program_keys:
-                    if row.get(k):
-                        program_name = row.get(k)
-                        break
-                row_has_error = False
-                # Error: student_id missing
-                if not student_id:
-                    messages.error(request, f"Row {i}: student_id is missing in the CSV.")
-                    row_has_error = True
-                else:
-                    try:
-                        user = User.objects.get(username=student_id)
-                    except User.DoesNotExist:
-                        messages.error(request, f"Row {i}: User with student_id '{student_id}' not found.")
-                        row_has_error = True
-                if not dept_name:
-                    messages.error(request, f"Row {i}: Department name is missing in the CSV.")
-                    row_has_error = True
-                else:
-                    norm_dept_name = normalize(dept_name)
-                    dept = dept_lookup.get(norm_dept_name)
-                    if not dept:
-                        messages.error(request, f"Row {i}: Department '{dept_name}' not found.")
-                        row_has_error = True
-                if not program_name:
-                    messages.error(request, f"Row {i}: Program name is missing in the CSV.")
-                    row_has_error = True
-                else:
-                    norm_program_name = normalize(program_name)
-                    program = program_lookup.get(norm_program_name)
-                    if not program:
-                        messages.error(request, f"Row {i}: Program '{program_name}' not found.")
-                        row_has_error = True
-                if not row_has_error and student_id:
-                    name = f"{user.first_name} {user.last_name}".strip()
-                    email = user.email
-                    from .models import Student
-                    try:
-                        student = Student.objects.get(student_id=student_id)
-                        # Compare all relevant fields
-                        diffs = []
-                        if student.std_name != name:
-                            diffs.append(("Name", student.std_name, name))
-                        if student.email != email:
-                            diffs.append(("Email", student.email, email))
-                        if student.phone_number != phone_number:
-                            diffs.append(("Phone Number", student.phone_number, phone_number))
-                        if student.parent_phone_number != parent_phone_number:
-                            diffs.append(("Parent Phone Number", student.parent_phone_number, parent_phone_number))
-                        if student.dept != dept:
-                            diffs.append(("Department", student.dept.dept_name if student.dept else "", dept.dept_name if dept else ""))
-                        if student.program != program:
-                            diffs.append(("Program", student.program.program_name if student.program else "", program.program_name if program else ""))
-                        if student.status != "ACTIVE":
-                            diffs.append(("Status", student.status, "ACTIVE"))
-                        if not diffs:
-                            messages.warning(request, f"Student with ID '{student_id}' already exists.")
-                        else:
-                            mismatches.append({
-                                "student_id": student_id,
-                                "diffs": diffs
-                            })
-                    except Student.DoesNotExist:
-                        # Create new student
-                        Student.objects.create(
-                            student_id=student_id,
-                            user=user,
-                            std_name=name,
-                            email=email,
-                            phone_number=phone_number,
-                            parent_phone_number=parent_phone_number,
-                            dept=dept,
-                            program=program,
-                            status="ACTIVE"
-                        )
-                        success_count += 1
-            if success_count:
-                messages.success(request, f"{success_count} students imported successfully.")
-            if mismatches:
-                request.session['student_mismatches'] = mismatches
-                return redirect('masters:student_update_conflicts')
-        except Exception as e:
-            messages.error(request, f"Error importing CSV: {e}")
-    else:
-        messages.error(request, "No file uploaded.")
-    return redirect("masters:student")
 
 @login_required
 def rooms_content(request):
@@ -1152,161 +1025,9 @@ def courses(request):
         messages.success(request, course_message)
     return render(request, "masters/courses.html", context)
 
-from .models import Course
-
 # ===== COURSE CSV UPLOAD =====
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
-@csrf_exempt
-@require_POST
-@login_required
-def course_upload(request):
-    if request.method == "POST" and request.FILES.get("csv_file"):
-        csv_file = request.FILES["csv_file"]
-        success_count = 0
-        duplicate_count = 0
-        error_count = 0
-        duplicate_codes = []
-
-        try:
-            decoded_file = TextIOWrapper(csv_file.file, encoding="utf-8")
-
-            # --- Read a sample to auto-detect delimiter ---
-            sample = decoded_file.read(2048)
-            decoded_file.seek(0)
-
-            sniffer = csv.Sniffer()
-            try:
-                dialect = sniffer.sniff(sample, delimiters=",;\t")
-            except Exception:
-                dialect = None
-
-            # --- Build DictReader with fallback logic ---
-            if dialect:
-                reader = csv.DictReader(decoded_file, dialect=dialect)
-            else:
-                # Try semicolon first
-                decoded_file.seek(0)
-                tmp_reader = csv.DictReader(decoded_file, delimiter=";")
-                headers = [h.strip().lower() for h in (tmp_reader.fieldnames or [])]
-                if "course_code" in headers and "course_name" in headers:
-                    decoded_file.seek(0)
-                    reader = csv.DictReader(decoded_file, delimiter=";")
-                else:
-                    decoded_file.seek(0)
-                    reader = csv.DictReader(decoded_file, delimiter=",")
-
-            # --- Normalize headers for robust matching ---
-            import re
-
-            def normalize_header(h: str) -> str:
-                # Remove whitespace/invisible chars and lowercase
-                return re.sub(
-                    r"[\s\u00A0\u200B\u200C\u200D\uFEFF]+", "", (h or "")
-                ).lower()
-
-            norm_headers = (
-                [normalize_header(h) for h in (reader.fieldnames or [])]
-                if reader.fieldnames
-                else []
-            )
-
-            def find_header(target: str):
-                target_norm = normalize_header(target)
-                for idx, h in enumerate(norm_headers):
-                    if h == target_norm:
-                        return reader.fieldnames[idx]
-                return None
-
-            code_col = find_header("course_code")
-            name_col = find_header("course_name")
-
-            if not code_col or not name_col:
-                messages.error(
-                    request,
-                    "CSV must have 'course_code' and 'course_name' columns.",
-                )
-                return redirect("masters:courses")
-
-            # --- First pass: validate rows and collect in memory ---
-            rows_info = []  # (line_no, code, name)
-
-            for i, row in enumerate(reader, start=2):
-                code = (row.get(code_col) or "").strip()
-                name = (row.get(name_col) or "").strip()
-
-                if not code or not name:
-                    messages.error(
-                        request,
-                        f"Row {i}: Missing course_code or course_name.",
-                    )
-                    error_count += 1
-                    continue
-
-                rows_info.append((i, code, name))
-
-            # If no valid data rows
-            if not rows_info:
-                if error_count:
-                    messages.error(
-                        request,
-                        "No courses uploaded. Please check your CSV file.",
-                    )
-                else:
-                    messages.error(
-                        request,
-                        "CSV file contains no data rows.",
-                    )
-                return redirect("masters:courses")
-
-            # --- Bulk check for duplicates ---
-            codes_set = {code for (_, code, _) in rows_info}
-
-            # One query to fetch existing courses
-            existing_courses = Course.objects.filter(course_code__in=codes_set)
-            # Compare case-insensitively by lowering both sides
-            existing_codes_lc = {c.course_code.lower() for c in existing_courses}
-
-            # Prepare new Course objects
-            new_courses = []
-            for i, code, name in rows_info:
-                if code.lower() in existing_codes_lc:
-                    duplicate_codes.append(code)
-                    duplicate_count += 1
-                    continue
-                new_courses.append(Course(course_code=code, course_name=name))
-                success_count += 1
-
-            # --- Bulk insert new courses ---
-            if new_courses:
-                Course.objects.bulk_create(new_courses, batch_size=1000)
-
-            # --- Messages ---
-            if success_count:
-                messages.success(
-                    request,
-                    f"{success_count} course(s) uploaded successfully.",
-                )
-            if duplicate_count:
-                messages.warning(
-                    request,
-                    f"{duplicate_count} duplicate course code(s) skipped: "
-                    + ", ".join(duplicate_codes),
-                )
-            if error_count and not (success_count or duplicate_count):
-                messages.error(
-                    request,
-                    "No courses uploaded. Please check your CSV file.",
-                )
-
-        except Exception as e:
-            messages.error(request, f"Error importing CSV: {e}")
-
-    else:
-        messages.error(request, "No file uploaded.")
-
-    return redirect("masters:courses")
-
 @login_required(login_url='/accounts/login/')
 def coursereg(request):
     user = request.user
@@ -1350,217 +1071,158 @@ def coursereg(request):
     })
 
 @login_required
+@login_required
 def coursereg_upload(request):
     if request.method == "POST" and request.FILES.get("csv_file"):
-        csv_file = request.FILES["csv_file"]
-        # --- Read file & detect delimiter ---
-        try:
-            decoded = (
-                csv_file.read()
-                .decode("utf-8-sig")
-                .replace("\r", "")
-                .splitlines()
-            )
-        except Exception as e:
-            messages.error(request, f"Could not read file: {e}")
-            return redirect(request.META.get("HTTP_REFERER", "/"))
-        sniffer = csv.Sniffer()
-        try:
-            dialect = sniffer.sniff("\n".join(decoded[:2]))
-            delimiter = dialect.delimiter
-        except Exception:
-            delimiter = ","
-        reader = csv.DictReader(decoded, delimiter=delimiter)
-        expected_fields = ["student_id", "course_code", "academic_year", "semester"]
-        def norm(s: str) -> str:
-            return s.strip().lower().replace(" ", "").replace("\t", "")
-        normalized_header = [norm(f) for f in (reader.fieldnames or [])]
-        normalized_expected = [norm(f) for f in expected_fields]
-        if normalized_header != normalized_expected:
-            messages.error(
-                request,
-                "CSV header mismatch. Expected: "
-                f"{', '.join(expected_fields)}. ",
-            )
-            return redirect(request.META.get("HTTP_REFERER", "/"))
-        # --- Pass 1: basic row validation, gather ids for bulk fetch ---
-        total = 0
-        conflict_rows = []
-        # we’ll collect candidate rows that are syntactically valid
-        candidate_rows = []  # list of dicts: {"sid", "ccode", "ay", "sem"}
-        sid_set = set()
-        course_code_set = set()
-        for row in reader:
-            total += 1
-            try:
-                sid = (row.get("student_id") or "").strip()
-                ccode = (row.get("course_code") or "").strip()
-                ay = (row.get("academic_year") or "").strip()
-                sem = (row.get("semester") or "").strip()
-            except Exception as e:
-                conflict_rows.append(
-                    {
-                        "student_id": "",
-                        "course_code": "",
-                        "academic_year": "",
-                        "semester": "",
-                        "reason": f"Malformed row: {e}",
-                    }
-                )
-                continue
-            if not sid or not ccode or not ay or not sem:
-                conflict_rows.append(
-                    {
-                        "student_id": sid,
-                        "course_code": ccode,
-                        "academic_year": ay,
-                        "semester": sem,
-                        "reason": "Missing required value(s)",
-                    }
-                )
-                continue
-            candidate_rows.append(
-                {"sid": sid, "ccode": ccode, "ay": ay, "sem": sem}
-            )
-            sid_set.add(sid)
-            course_code_set.add(ccode)
-        # If the sheet is empty (no data rows), show error
-        if total == 0:
-            messages.error(request, "CSV file contains no data rows.")
-            return redirect(request.META.get("HTTP_REFERER", "/"))
-        # --- Bulk fetch Students and Courses ---
+        from io import TextIOWrapper
+        import csv
+        import collections
         from .models import Student, Course
         from operations.models import StudentCourse
-        students_qs = Student.objects.filter(student_id__in=sid_set)
-        students_map = {s.student_id: s for s in students_qs}
-        missing_student_ids = sorted(sid_set - set(students_map.keys()))
-        if missing_student_ids:
-            messages.error(
-                request,
-                "No student(s) exist with ID(s): "
-                + ", ".join(missing_student_ids)
-                + ".",
-            )
-        courses_qs = Course.objects.filter(course_code__in=course_code_set)
-        courses_map = {c.course_code: c for c in courses_qs}
-        missing_course_codes = sorted(course_code_set - set(courses_map.keys()))
-        if missing_course_codes:
-            messages.error(
-                request,
-                "No course(s) exist with code(s): "
-                + ", ".join(missing_course_codes)
-                + ".",
-            )
-        # --- Bulk fetch existing StudentCourse registrations ---
-        student_ids = {students_map[sid].id for sid in sid_set if sid in students_map}
-        course_ids = {courses_map[cc].id for cc in course_code_set if cc in courses_map}
-        existing_regs = StudentCourse.objects.filter(
-            student_id__in=student_ids,
-            course_id__in=course_ids,
-        )
-        # exact registrations: (student_id, course_id, ay, sem)
-        existing_exact = set(
-            (reg.student_id, reg.course_id, reg.academic_year, reg.semester)
-            for reg in existing_regs
-        )
-        # any registration for (student, course), to detect conflicts in *other* terms
-        # store first term we see
-        existing_pair_info = {}
-        for reg in existing_regs:
-            key = (reg.student_id, reg.course_id)
-            if key not in existing_pair_info:
-                existing_pair_info[key] = (reg.academic_year, reg.semester)
-        # --- Decide duplicates / conflicts / new rows in memory ---
-        new_objects = []
+        from django.db import transaction
+
+        csv_file = request.FILES["csv_file"]
+        success_count = 0
+        error_groups = collections.defaultdict(list)
+        conflict_rows = []
         dup_count = 0
-        for entry in candidate_rows:
-            sid = entry.get("sid")
-            ccode = entry.get("ccode")
-            ay = entry.get("ay")
-            sem = entry.get("sem")
-            student = students_map.get(sid)
-            course = courses_map.get(ccode)
-            if not student or not course:
-                # Already reported above, skip
-                continue
-            key_exact = (getattr(student, 'id', None), getattr(course, 'id', None), ay, sem)
-            key_pair = (getattr(student, 'id', None), getattr(course, 'id', None))
-            if key_exact in existing_exact:
-                # Exact duplicate
-                dup_count += 1
-                continue
-            if key_pair in existing_pair_info:
-                old_ay, old_sem = existing_pair_info[key_pair]
-                conflict_rows.append(
-                    {
-                        "student_id": sid,
-                        "course_code": ccode,
-                        "academic_year": ay,
-                        "semester": sem,
-                        "reason": "Student already registered for this course in another term",
-                        "old_academic_year": old_ay,
-                        "old_semester": old_sem,
-                    }
-                )
-                continue
-            # New registration
-            new_objects.append(
-                StudentCourse(
-                    student=student,
-                    course=course,
-                    academic_year=ay,
-                    semester=sem,
-                    is_active=True,
-                )
-            )
-        new_count = len(new_objects)
-        conf_count = len(conflict_rows)
-        # --- Insert new rows in bulk ---
-        if new_objects:
-            with transaction.atomic():
-                StudentCourse.objects.bulk_create(new_objects, batch_size=1000)
-        # --- Prepare messages & conflict view ---
-        if conf_count > 0:
-            if dup_count > 0:
-                messages.warning(
-                    request,
-                    f"{dup_count}/{total} found to be duplicate.",
-                )
-            if new_count > 0:
-                messages.success(
-                    request,
-                    f"{new_count}/{total} uploaded successfully.",
-                )
-            messages.error(
-                request,
-                f"{conf_count}/{total} found to have conflicts.",
-            )
-            # Store conflicts in session for resolve view fallback
-            request.session["coursereg_conflicts"] = conflict_rows
-            return render(
-                request,
-                "masters/coursereg_conflict.html",
-                {"conflicts": conflict_rows},
-            )
-        # No conflicts
-        if dup_count == total and total > 0:
-            messages.info(
-                request,
-                "No new data found. All the data uploaded already exists and matches exactly.",
-            )
-        elif new_count > 0:
-            messages.success(
-                request,
-                f"All {new_count} uploaded successfully.",
-            )
-        elif dup_count > 0:
-            messages.info(
-                request,
-                f"All {dup_count} found to be duplicate.",
-            )
-        return redirect(request.META.get("HTTP_REFERER", "/"))
-    # If not POST or no file, always return a response
-    messages.error(request, "No file uploaded or invalid request.")
+
+        try:
+            # Use TextIOWrapper for robust decoding and universal newlines
+            decoded_file = TextIOWrapper(csv_file.file, encoding="utf-8-sig")
+            
+            # Use sniffer for robust delimiter detection
+            sample = decoded_file.read(2048)
+            decoded_file.seek(0)
+            try:
+                dialect = csv.Sniffer().sniff(sample, delimiters=",;\t")
+                reader = csv.DictReader(decoded_file, dialect=dialect)
+            except Exception:
+                reader = csv.DictReader(decoded_file)
+
+            if not reader.fieldnames:
+                messages.error(request, "CSV file is missing headers.")
+                return redirect(request.META.get("HTTP_REFERER", "/"))
+
+            def norm(s: str) -> str:
+                return (s or "").strip().lower().replace(" ", "").replace("_", "").replace("\t", "")
+
+            f_map = {norm(k): k for k in reader.fieldnames}
+            required = ["studentid", "coursecode", "academicyear", "semester"]
+            missing = [f for f in required if f not in f_map]
+
+            if missing:
+                messages.error(request, f"CSV missing required columns: {', '.join(missing)}")
+                return redirect(request.META.get("HTTP_REFERER", "/"))
+
+            valid_rows = []
+            sid_set = set()
+            course_set = set()
+            total_rows = 0
+
+            for i, row in enumerate(reader, start=2):
+                total_rows += 1
+                try:
+                    sid = (row.get(f_map["studentid"]) or "").strip()
+                    ccode = (row.get(f_map["coursecode"]) or "").strip()
+                    ay = (row.get(f_map["academicyear"]) or "").strip()
+                    sem = (row.get(f_map["semester"]) or "").strip()
+                    reg = (row.get(f_map.get("registrationtype", "")) or "REGULAR").strip()
+
+                    if not all([sid, ccode, ay, sem]):
+                        error_groups["Missing required values (student_id, course_code, etc.)"].append(i)
+                        continue
+
+                    # Normalization for student_id lookup
+                    import unicodedata, re
+                    sid_norm = unicodedata.normalize("NFKC", sid)
+                    sid_norm = re.sub(r"[\s\u00A0\u200B\u200C\u200D\ufeff]+", " ", sid_norm).strip().lower()
+
+                    valid_rows.append({"i": i, "sid": sid, "sid_norm": sid_norm, "ccode": ccode, "ay": ay, "sem": sem, "reg": reg})
+                    sid_set.add(sid_norm)
+                    course_set.add(ccode.lower())
+                except Exception as e:
+                    error_groups[f"Malformed row: {e}"].append(i)
+
+            if not valid_rows:
+                if error_groups:
+                    for msg, rows in error_groups.items():
+                        messages.warning(request, f"Rows {', '.join(map(str, sorted(rows)))}: {msg}")
+                return redirect(request.META.get("HTTP_REFERER", "/"))
+
+            # Bulk fetch
+            students_map = {s.student_id.lower(): s for s in Student.objects.filter(student_id__in=sid_set)}
+            courses_map = {c.course_code.lower(): c for c in Course.objects.filter(course_code__in=course_set)}
+
+            # Registration checks
+            existing_regs = StudentCourse.objects.filter(
+                student__student_id__in=sid_set,
+                course__course_code__in=course_set
+            ).select_related('student', 'course')
+
+            existing_exact = set((r.student.student_id.lower(), r.course.course_code.lower(), str(r.academic_year), str(r.semester)) for r in existing_regs)
+            existing_pairs = {(r.student.student_id.lower(), r.course.course_code.lower()): (r.academic_year, r.semester) for r in existing_regs}
+
+            new_objects = []
+            for r in valid_rows:
+                student = students_map.get(r["sid_norm"])
+                course = courses_map.get(r["ccode"].lower())
+
+                if not student:
+                    error_groups[f"Student '{r['sid']}' not found in system"].append(r["i"])
+                    continue
+                if not course:
+                    error_groups[f"Course '{r['ccode']}' not found in system"].append(r["i"])
+                    continue
+
+                key_exact = (r["sid_norm"], r["ccode"].lower(), str(r["ay"]), str(r["sem"]))
+                key_pair = (r["sid_norm"], r["ccode"].lower())
+
+                if key_exact in existing_exact:
+                    dup_count += 1
+                    continue
+                
+                if key_pair in existing_pairs:
+                    old_ay, old_sem = existing_pairs[key_pair]
+                    conflict_rows.append({
+                        "student_id": r["sid"], "course_code": r["ccode"], "academic_year": r["ay"], "semester": r["sem"],
+                        "reason": "Already registered for this course in another term",
+                        "old_academic_year": old_ay, "old_semester": old_sem,
+                        "row_num": r["i"]
+                    })
+                    continue
+
+                new_objects.append(StudentCourse(
+                    student=student, course=course, academic_year=r["ay"], semester=r["sem"],
+                    registration_type=r["reg"], is_active=True
+                ))
+
+            if new_objects:
+                with transaction.atomic():
+                    StudentCourse.objects.bulk_create(new_objects, batch_size=1000)
+                success_count = len(new_objects)
+
+            # Success / Duplicate Messages
+            if success_count:
+                messages.success(request, f"{success_count}/{total_rows} registrations uploaded successfully.")
+            if dup_count:
+                messages.info(request, f"{dup_count}/{total_rows} exact duplicates skipped.")
+
+            # Error Groups Message
+            if error_groups:
+                for msg, rows in error_groups.items():
+                    messages.warning(request, f"Rows {', '.join(map(str, sorted(rows)))}: {msg}")
+
+            # Conflict Handling (Interactive resolution)
+            if conflict_rows:
+                messages.error(request, f"{len(conflict_rows)} registrations found to have conflicts.")
+                request.session["coursereg_conflicts"] = conflict_rows
+                return render(request, "masters/coursereg_conflict.html", {"conflicts": conflict_rows})
+
+        except Exception as e:
+            messages.error(request, f"Error importing CSV: {e}")
+    else:
+        messages.error(request, "No file uploaded.")
     return redirect(request.META.get("HTTP_REFERER", "/"))
 
 # Final fallback to ensure HttpResponse is always returned
@@ -1628,14 +1290,25 @@ def student_upload(request):
 
             mismatches = []
 
+            import collections
+            error_groups = collections.defaultdict(list)
+
             # --- First pass: validate row structure and lookups, collect data ---
             valid_rows = []  # each item: dict with row_num, student_id, phones, dept, program, batch
             sid_to_rows = {}  # student_id -> list of row numbers (for error messages)
+            seen_sids_in_csv = {} # student_id -> first row_num seen
 
             for i, row in enumerate(reader, start=2):
                 student_id = (
-                    row.get(field_map.get("student_id")) if field_map.get("student_id") else None
+                    normalize(row.get(field_map.get("student_id"))) if field_map.get("student_id") else None
                 )
+                if student_id:
+                    if student_id in seen_sids_in_csv:
+                        error_groups[f"Duplicate student_id '{student_id}' found in the CSV (first seen at Row {seen_sids_in_csv[student_id]})."].append(i)
+                        continue
+                    else:
+                        seen_sids_in_csv[student_id] = i
+                
                 phone_number = (
                     row.get(field_map.get("phone_number"))
                     if field_map.get("phone_number")
@@ -1660,61 +1333,40 @@ def student_upload(request):
 
                 # Basic validations (no DB queries yet)
                 if not student_id:
-                    messages.error(
-                        request, f"Row {i}: student_id is missing in the CSV."
-                    )
+                    error_groups["student_id is missing in the CSV."].append(i)
                     row_has_error = True
 
                 if not dept_name:
-                    messages.error(
-                        request,
-                        f"Row {i}: Department name is missing in the CSV.",
-                    )
+                    error_groups["Department name is missing in the CSV."].append(i)
                     row_has_error = True
                     dept = None
                 else:
                     norm_dept_name = normalize(dept_name)
                     dept = dept_lookup.get(norm_dept_name)
                     if not dept:
-                        messages.error(
-                            request, f"Row {i}: Department '{dept_name}' not found."
-                        )
+                        error_groups[f"Department '{dept_name}' not found."].append(i)
                         row_has_error = True
 
                 if not program_name:
-                    messages.error(
-                        request,
-                        f"Row {i}: Program name is missing in the CSV.",
-                    )
+                    error_groups["Program name is missing in the CSV."].append(i)
                     row_has_error = True
                     program = None
                 else:
                     norm_program_name = normalize(program_name)
                     program = program_lookup.get(norm_program_name)
                     if not program:
-                        messages.error(
-                            request,
-                            f"Row {i}: Program '{program_name}' not found.",
-                        )
+                        error_groups[f"Program '{program_name}' not found."].append(i)
                         row_has_error = True
 
                 if not batch_code:
-                    messages.error(
-                        request,
-                        "Row "
-                        f"{i}: Regulation/Batch code is missing in the CSV. Regulation is mandatory.",
-                    )
+                    error_groups["Regulation/Batch code is missing in the CSV. Regulation is mandatory."].append(i)
                     row_has_error = True
                     batch = None
                 else:
                     norm_batch_code = normalize(batch_code)
                     batch = batch_lookup.get(norm_batch_code)
                     if not batch:
-                        messages.error(
-                            request,
-                            "Row "
-                            f"{i}: Regulation/Batch code '{batch_code}' not found in the system. Please add the batch first.",
-                        )
+                        error_groups[f"Regulation/Batch code not found: '{batch_code}'"].append(i)
                         row_has_error = True
 
                 if row_has_error or not student_id:
@@ -1734,30 +1386,43 @@ def student_upload(request):
                 )
                 sid_to_rows.setdefault(student_id, []).append(i)
 
-            # If no structurally valid rows, stop
-            if not valid_rows:
-                return redirect("masters:student")
-
             # --- Bulk fetch Users for all student_ids ---
-            student_ids = {r["student_id"] for r in valid_rows}
-            users_qs = User.objects.filter(username__in=student_ids)
-            users_map = {u.username: u for u in users_qs}
+            if valid_rows:
+                student_ids = {r["student_id"] for r in valid_rows}
+                users_qs = User.objects.filter(username__in=student_ids)
+                users_map = {u.username: u for u in users_qs}
 
-            missing_user_ids = sorted(student_ids - set(users_map.keys()))
-            if missing_user_ids:
-                # Report missing users per row
+                missing_user_ids = sorted(student_ids - set(users_map.keys()))
                 for sid in missing_user_ids:
-                    for row_num in sid_to_rows.get(sid, []):
-                        messages.error(
-                            request,
-                            f"Row {row_num}: User with student_id '{sid}' not found.",
-                        )
+                    rows_str = ", ".join(map(str, sid_to_rows.get(sid, [])))
+                    error_groups[f"User with student_id '{sid}' not found"].append(f"Rows {rows_str}")
+                
                 # Filter out rows that don't have a User
                 valid_rows = [
                     r for r in valid_rows if r["student_id"] in users_map
                 ]
-                if not valid_rows:
-                    return redirect("masters:student")
+
+            # Report all grouped errors from Stages 1 and 2
+            if error_groups:
+                # Group errors by generic message to satisfy user request
+                # e.g. "User not found" -> list of IDs
+                generic_groups = collections.defaultdict(list)
+                for msg, identifiers in error_groups.items():
+                    if "User with student_id" in msg:
+                        generic_groups["Users not found in system"].append(msg.split("'")[1])
+                    elif "Regulation/Batch code not found" in msg:
+                        generic_groups["Regulation/Batch codes not found in system"].append(msg.split("'")[1])
+                    else:
+                        rows_str = ", ".join(map(str, sorted(identifiers)))
+                        messages.error(request, f"Rows {rows_str}: {msg}")
+                
+                for gen_msg, p_ids in generic_groups.items():
+                    ids_str = ", ".join(sorted(set(p_ids)))
+                    messages.error(request, f"{gen_msg}: {ids_str}")
+
+            # If no structurally valid rows, stop
+            if not valid_rows:
+                return redirect("masters:student")
 
             # --- Bulk fetch existing Students ---
             existing_students_qs = Student.objects.filter(
@@ -1836,14 +1501,8 @@ def student_upload(request):
                                 batch.batch_code if batch else "",
                             )
                         )
-                    if student.status != "ACTIVE":
-                        diffs.append(("Status", student.status, "ACTIVE"))
-
                     if not diffs:
-                        messages.warning(
-                            request,
-                            f"Student with ID '{sid}' already exists.",
-                        )
+                        error_groups[f"Student with ID '{sid}' already exists."].append(row_num)
                     else:
                         mismatches.append({"student_id": sid, "diffs": diffs})
                 else:
@@ -1872,6 +1531,13 @@ def student_upload(request):
                 messages.success(
                     request, f"{success_count} students imported successfully."
                 )
+
+            if error_groups:
+                for msg, identifiers in error_groups.items():
+                    if "Student with ID" in msg:
+                        rows_str = ", ".join(map(str, sorted(identifiers)))
+                        messages.warning(request, f"Rows {rows_str}: {msg}")
+
             if mismatches:
                 request.session["student_mismatches"] = mismatches
                 return redirect("masters:student_update_conflicts")
@@ -1992,13 +1658,17 @@ def faculty_update_conflicts(request):
 
 
 # ===== ROOM CSV UPLOAD =====
+@login_required
 def room_upload(request):
     if request.method == "POST" and request.FILES.get("csv_file"):
         from io import TextIOWrapper
         import csv
+        import collections
+        from .models import Room
 
         csv_file = request.FILES["csv_file"]
         success_count = 0
+        error_groups = collections.defaultdict(list)
 
         try:
             decoded_file = TextIOWrapper(csv_file.file, encoding="utf-8")
@@ -2008,129 +1678,88 @@ def room_upload(request):
                 messages.error(request, "CSV file is missing headers.")
                 return redirect("masters:rooms")
 
-            field_map = {k.strip().lower(): k for k in reader.fieldnames}
+            field_map = {k.strip().lower().replace(" ", "").replace("_", ""): k for k in reader.fieldnames}
+            
+            # Acceptance: room_id as room_code
+            if "roomcode" not in field_map and "roomid" in field_map:
+                field_map["roomcode"] = field_map["roomid"]
 
-            required_fields = ["room_code", "block", "floor", "rows", "columns"]
+            required_fields = ["roomcode", "block", "floor", "rows", "columns"]
+            missing_cols = [f for f in required_fields if f not in field_map]
 
-            # Accept room_id as room_code
-            if "room_code" not in field_map and "room_id" in field_map:
-                field_map["room_code"] = field_map["room_id"]
-
-            # Ensure all required columns exist
-            for field in required_fields:
-                if field not in field_map:
-                    messages.error(
-                        request, f"CSV missing required column: {field}"
-                    )
-                    return redirect("masters:rooms")
-
-            from .models import Room
-
-            mismatches = []
-            valid_rows = []  # list of dicts: {row_num, code, block, floor, rows, columns}
-
-            # --- First pass: validate rows & collect data ---
-            for i, row in enumerate(reader, start=2):
-                code = (row.get(field_map["room_code"]) or "").strip()
-                block = (row.get(field_map["block"]) or "").strip()
-                floor = (row.get(field_map["floor"]) or "").strip()
-                rows_val = (row.get(field_map["rows"]) or "").strip()
-                columns_val = (row.get(field_map["columns"]) or "").strip()
-
-                if not code or not block or not floor or not rows_val or not columns_val:
-                    messages.error(
-                        request, f"Row {i}: Missing required room data."
-                    )
-                    continue
-
-                # Validate that rows/columns are integers
-                try:
-                    rows_int = int(rows_val)
-                    columns_int = int(columns_val)
-                except ValueError:
-                    messages.error(
-                        request,
-                        f"Row {i}: Rows and Columns must be integers. "
-                        f"Got rows='{rows_val}', columns='{columns_val}'.",
-                    )
-                    continue
-
-                valid_rows.append(
-                    {
-                        "row_num": i,
-                        "code": code,
-                        "block": block,
-                        "floor": floor,
-                        "rows": rows_int,
-                        "columns": columns_int,
-                    }
-                )
-
-            if not valid_rows:
-                # Nothing to process
+            if missing_cols:
+                messages.error(request, f"CSV missing required columns: {', '.join(missing_cols)}")
                 return redirect("masters:rooms")
 
-            # --- Bulk fetch existing rooms ---
-            codes_set = {r["code"] for r in valid_rows}
-            existing_rooms = Room.objects.filter(room_code__in=codes_set)
+            mismatches = []
+            valid_rows = []
 
-            # Use lowercase mapping to mimic __iexact behaviour
-            existing_map = {r.room_code.lower(): r for r in existing_rooms}
+            for i, row in enumerate(reader, start=2):
+                code = (row.get(field_map["roomcode"]) or "").strip()
+                block = (row.get(field_map["block"]) or "").strip()
+                floor = (row.get(field_map["floor"]) or "").strip()
+                r_val = (row.get(field_map["rows"]) or "").strip()
+                c_val = (row.get(field_map["columns"]) or "").strip()
+                type_val = (row.get(field_map.get("roomtype", "")) or "").strip()
+
+                if not all([code, block, floor, r_val, c_val]):
+                    error_groups["Missing required room data"].append(i)
+                    continue
+
+                try:
+                    rows_int = int(r_val)
+                    cols_int = int(c_val)
+                    valid_rows.append({
+                        "row_num": i, "code": code, "block": block, 
+                        "floor": floor, "rows": rows_int, "columns": cols_int,
+                        "room_type": type_val
+                    })
+                except ValueError:
+                    error_groups["Rows and Columns must be integers"].append(i)
+
+            if not valid_rows:
+                if error_groups:
+                    for msg, rows in error_groups.items():
+                        messages.warning(request, f"Rows {', '.join(map(str, sorted(rows)))}: {msg}")
+                return redirect("masters:rooms")
+
+            # Bulk fetch
+            codes_set = {r["code"] for r in valid_rows}
+            existing_map = {r.room_code.lower(): r for r in Room.objects.filter(room_code__in=codes_set)}
 
             new_rooms = []
-
-            # --- Decide existing vs new; collect mismatches; prepare bulk_create ---
             for data in valid_rows:
-                code = data["code"]
-                block = data["block"]
-                floor = data["floor"]
-                rows_int = data["rows"]
-                columns_int = data["columns"]
-                row_num = data["row_num"]
-
-                key_lc = code.lower()
-                room = existing_map.get(key_lc)
-
-                if room:
+                existing = existing_map.get(data["code"].lower())
+                if existing:
                     diffs = []
-
-                    if str(room.rows) != str(rows_int):
-                        diffs.append(("Rows", room.rows, rows_int))
-                    if str(room.columns) != str(columns_int):
-                        diffs.append(("Columns", room.columns, columns_int))
-                    if (room.floor or "") != floor:
-                        diffs.append(("Floor", room.floor, floor))
-                    if (room.block or "") != block:
-                        diffs.append(("Block", room.block, block))
+                    if existing.rows != data["rows"]: diffs.append(("Rows", existing.rows, data["rows"]))
+                    if existing.columns != data["columns"]: diffs.append(("Columns", existing.columns, data["columns"]))
+                    if (existing.floor or "") != data["floor"]: diffs.append(("Floor", existing.floor, data["floor"]))
+                    if (existing.block or "") != data["block"]: diffs.append(("Block", existing.block, data["block"]))
+                    if (existing.room_type or "") != data["room_type"]: diffs.append(("Room Type", existing.room_type, data["room_type"]))
 
                     if diffs:
-                        mismatches.append({"room_code": code, "diffs": diffs})
+                        mismatches.append({"room_code": data["code"], "diffs": diffs})
                     else:
-                        messages.warning(
-                            request,
-                            f"Row {row_num}: Room '{code}' already exists and matches.",
-                        )
+                        error_groups[f"Room '{data['code']}' already exists."].append(data["row_num"])
                 else:
-                    # New room → bulk_create later
-                    new_rooms.append(
-                        Room(
-                            room_code=code,
-                            block=block,
-                            floor=floor,
-                            rows=rows_int,
-                            columns=columns_int,
-                        )
-                    )
-                    success_count += 1
+                    new_rooms.append(Room(
+                        room_code=data["code"], block=data["block"], floor=data["floor"],
+                        rows=data["rows"], columns=data["columns"],
+                        room_type=data["room_type"],
+                        capacity=data["rows"] * data["columns"]  # Manually calculate for bulk_create
+                    ))
 
-            # --- Bulk insert new rooms ---
             if new_rooms:
                 Room.objects.bulk_create(new_rooms, batch_size=1000)
+                success_count = len(new_rooms)
 
             if success_count:
-                messages.success(
-                    request, f"{success_count} room(s) uploaded successfully."
-                )
+                messages.success(request, f"{success_count} room(s) uploaded successfully.")
+
+            if error_groups:
+                for msg, rows in error_groups.items():
+                    messages.warning(request, f"Rows {', '.join(map(str, sorted(rows)))}: {msg}")
 
             if mismatches:
                 request.session["room_mismatches"] = mismatches
@@ -2140,7 +1769,6 @@ def room_upload(request):
             messages.error(request, f"Error importing CSV: {e}")
     else:
         messages.error(request, "No file uploaded.")
-
     return redirect("masters:rooms")
 
 
@@ -2173,6 +1801,8 @@ def room_update_conflicts(request):
                         room.floor = new
                     elif field == 'Block':
                         room.block = new
+                    elif field == 'Room Type':
+                        room.room_type = new
                     # Capacity is auto-computed; do not set directly
                 room.save()
                 updated.append(room_code)

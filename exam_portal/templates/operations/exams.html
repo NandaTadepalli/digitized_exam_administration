@@ -33,6 +33,15 @@
                 <input type="date" id="edit_exam_date" name="exam_date" required>
             </div>
             <div class="mb-1em">
+                <label for="edit_registration_type">Registration Type:</label>
+                <select id="edit_registration_type" name="registration_type" required>
+                    <option value="">Select Reg. Type</option>
+                    {% for rt in reg_types %}
+                    <option value="{{ rt }}">{{ rt }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="mb-1em">
                 <label for="edit_start_time">Start Time:</label>
                 <br>
                 <input type="time" id="edit_start_time" name="start_time" required>
@@ -69,22 +78,20 @@
             <input type="hidden" name="start_date" value="{{ q_start_date }}">
             <input type="hidden" name="end_date" value="{{ q_end_date }}">
 
-            {% with q_params="" %}
-            {% if request.GET.exam_id %}{% with q_params=q_params|add:"exam_id="|add:request.GET.exam_id|add:"&" %}{%
-            endwith %}{% endif %}
-            {% if request.GET.exam_name %}{% with q_params=q_params|add:"exam_name="|add:request.GET.exam_name|add:"&"
-            %}{% endwith %}{% endif %}
-            {% if request.GET.start_date %}{% with
-            q_params=q_params|add:"start_date="|add:request.GET.start_date|add:"&" %}{% endwith %}{% endif %}
-            {% if request.GET.end_date %}{% with q_params=q_params|add:"end_date="|add:request.GET.end_date|add:"&" %}{%
-            endwith %}{% endif %}
+            {% with q_p_id=request.GET.exam_id q_p_name=request.GET.exam_name q_p_start=request.GET.start_date q_p_end=request.GET.end_date %}
             <script>
                 // Set form action with query params on error
                 (function () {
                     var form = document.getElementById('examSlotForm');
-                    var params = '{{ q_params|slice:":-1" }}';
-                    if (params) {
-                        form.action = form.action + '?' + params;
+                    var params = [];
+                    if ("{{ q_p_id|default:'' }}") params.push("exam_id={{ q_p_id }}");
+                    if ("{{ q_p_name|default:'' }}") params.push("exam_name={{ q_p_name|urlencode }}");
+                    if ("{{ q_p_start|default:'' }}") params.push("start_date={{ q_p_start }}");
+                    if ("{{ q_p_end|default:'' }}") params.push("end_date={{ q_p_end }}");
+
+                    if (params.length > 0) {
+                        var baseUrl = form.action.split('?')[0];
+                        form.action = baseUrl + '?' + params.join('&');
                     }
                 })();
             </script>
@@ -93,8 +100,7 @@
             <input type="hidden" name="exam_id" value="{{ request.GET.exam_id|default:'' }}">
             <label for="examname">Exam Name:</label>
             <input type="text" id="examname" name="examname" placeholder="Enter exam name" required
-                value="{{ examname|default:form_data.examname|default:''|default_if_none:'' }}" readonly
-                class="bg-f5">
+                value="{{ examname|default:form_data.examname|default:''|default_if_none:'' }}" readonly class="bg-f5">
             <label for="examtype">Exam Type:</label>
             <select name="examtype" id="examtype" required>
                 <option value="">Select Exam Type</option>
@@ -139,6 +145,14 @@
                 <option value="EV" {% if form_data.slot_code == 'EV' %}selected{% endif %}>EV</option>
             </select>
 
+            <label for="registration_type">Registration Type:</label>
+            <select name="registration_type" id="registration_type" required>
+                <option value="">Select Reg Type</option>
+                {% for rt in reg_types %}
+                <option value="{{ rt }}" {% if form_data.registration_type == rt %}selected{% endif %}>{{ rt }}</option>
+                {% endfor %}
+            </select>
+
         </form>
         <a href="#" class="action-link ml-10" onclick="clearExamSlotForm(); return false;">Clear</a>
         <a href="#" class="action-link" id="createExamSlotLink">Create Exam Slot</a>
@@ -169,6 +183,7 @@
                     <th>Start Time</th>
                     <th>End Time</th>
                     <th>Slot Code</th>
+                    <th>Registration Type</th>
                     <th>Course Assignment</th>
                     <th>Course Count</th>
                     <th>Student Count</th>
