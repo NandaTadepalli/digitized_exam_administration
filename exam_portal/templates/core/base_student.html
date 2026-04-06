@@ -7,10 +7,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Student Portal{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="{% static 'css/loader.css' %}">
     <link href="https://fonts.googleapis.com/css2?family=Poppins&display=swap" rel="stylesheet">
 </head>
 
 <body>
+    <div class="top-progress"></div>
     <button class="hamburger" id="openSidebarBtn" aria-label="Open sidebar">
         <span></span>
         <span></span>
@@ -97,6 +99,22 @@
     </script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="{% static 'js/scripts.js' %}"></script>
+    <script src="{% static 'js/loader.js' %}"></script>
+
+    <!-- Global Loader HTML -->
+    <div class="loader-overlay">
+        <div class="loader-content">
+            <div class="aurora-orb-container">
+                <div class="aurora-orb"></div>
+                <div class="orbit orbit-1"></div>
+                <div class="orbit orbit-2"></div>
+                <div class="orbit orbit-3"></div>
+            </div>
+            <div class="loader-text">Loading...</div>
+            <div class="loader-subtext">Please wait while we process your request.</div>
+            <button class="loader-dismiss" id="loader-dismiss">Stop & Stay Here</button>
+        </div>
+    </div>
 </body>
 
 </html>

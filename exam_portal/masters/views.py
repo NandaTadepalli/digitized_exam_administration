@@ -290,7 +290,8 @@ def batch_upload(request):
                     ))
 
             if new_batches:
-                Batch.objects.bulk_create(new_batches, batch_size=1000)
+                with transaction.atomic():
+                    Batch.objects.bulk_create(new_batches, batch_size=1000)
                 success_count = len(new_batches)
 
             if success_count:
@@ -433,7 +434,8 @@ def course_upload(request):
                 ))
 
             if new_courses:
-                Course.objects.bulk_create(new_courses, batch_size=1000)
+                with transaction.atomic():
+                    Course.objects.bulk_create(new_courses, batch_size=1000)
                 success_count = len(new_courses)
 
             if success_count:
@@ -660,7 +662,8 @@ def faculty_upload(request):
 
             # Bulk create new faculty
             if new_faculty_objects:
-                Faculty.objects.bulk_create(new_faculty_objects, batch_size=1000)
+                with transaction.atomic():
+                    Faculty.objects.bulk_create(new_faculty_objects, batch_size=1000)
                 success_count = len(new_faculty_objects)
 
             if success_count:
@@ -1524,7 +1527,8 @@ def student_upload(request):
 
             # Bulk create new students
             if new_students:
-                Student.objects.bulk_create(new_students, batch_size=1000)
+                with transaction.atomic():
+                    Student.objects.bulk_create(new_students, batch_size=1000)
                 success_count = len(new_students)
 
             if success_count:
@@ -1751,7 +1755,8 @@ def room_upload(request):
                     ))
 
             if new_rooms:
-                Room.objects.bulk_create(new_rooms, batch_size=1000)
+                with transaction.atomic():
+                    Room.objects.bulk_create(new_rooms, batch_size=1000)
                 success_count = len(new_rooms)
 
             if success_count:

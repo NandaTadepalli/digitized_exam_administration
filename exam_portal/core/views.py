@@ -517,8 +517,10 @@ def upload_users(request):
             # --- Prepare bulk list for new users ---
             users_to_create = []
 
-            # Precompute student default password hash ONCE
+            # Precompute student default password hash
             student_default_pw_hash = make_password("Test@123")
+            # For other roles, use a standard default to avoid hashing per-row (MUCH faster)
+            general_default_pw_hash = make_password("ChangeMe@123")
 
             with transaction.atomic():
                 for (
@@ -573,11 +575,14 @@ def upload_users(request):
                                 }
                                 mismatch_rows.append((username, mismatches, new_data))
                     else:
-                        # NEW USER → don't save one-by-one, collect for bulk_create
+                        # NEW USER → Use pre-computed hashes
                         if role == "student":
                             password_hash = student_default_pw_hash
                         else:
-                            password_hash = make_password(f"{username}@{username}")
+                            # Using a shared default password for performance. 
+                            # If individual per-user passwords are required, we would 
+                            # need a background task as hashing is intentionally slow.
+                            password_hash = general_default_pw_hash
 
                         user = User(
                             username=username,
