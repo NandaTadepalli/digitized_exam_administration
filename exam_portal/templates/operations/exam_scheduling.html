@@ -18,14 +18,15 @@
     <!-- Filters removed. Data will be auto-fetched based on academic year and semester from examinations table. -->
     <form id="examScheduleGroupsForm" method="post" action="" data-slot-id="{{ slot.id }}"
         data-academic-year="{{ slot.examination.academic_year }}" data-semester="{{ slot.examination.semester }}"
-        data-regulation="{{ slot.regulation|default:'' }}">
+        data-regulation="{{ slot.regulation|default:'' }}"
+        data-locked="{{ is_locked|yesno:'true,false' }}">
         {% csrf_token %}
         <div class="table-responsive overflow-x-auto">
             <div class="max-h-65vh">
                 <table id="exam-schedule-groups-table">
                     <thead class="sticky-header-f8">
                         <tr>
-                            <th><input type="checkbox" id="selectAllGroups"></th>
+                            <th><input type="checkbox" id="selectAllGroups" {% if is_locked %}disabled title="Examination is Locked"{% endif %}></th>
                             <th>Course Code</th>
                             <th>Course Name</th>
                             <th>Registration Type</th>
@@ -41,8 +42,15 @@
                 </table>
             </div>
         </div>
-        <button type="submit" class="control-btn" id="confirmScheduleBtn" class="d-none">Confirm Scheduling for
-            Selected Groups</button>
+        {% if is_locked %}
+            <div class="locked-banner-inline mt-10" style="background:#fef2f2;color:#b91c1c;padding:12px;border-radius:10px;border:1px solid #fee2e2;font-weight:600;display:flex;align-items:center;">
+                <img src="https://img.icons8.com/?size=100&id=DZbPJ4lsqOdQ&format=png&color=b91c1c" style="width:20px;height:20px;margin-right:10px;">
+                This examination is Locked. Scheduling modifications are disabled.
+            </div>
+        {% else %}
+            <button type="submit" class="control-btn" id="confirmScheduleBtn" class="d-none">Confirm Scheduling for Selected Groups</button>
+        {% endif %}
+    </form>
     </form>
 </div>
 {% endblock %}

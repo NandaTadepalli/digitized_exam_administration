@@ -157,12 +157,16 @@
         <a href="#" class="action-link ml-10" onclick="clearExamSlotForm(); return false;">Clear</a>
         <a href="#" class="action-link" id="createExamSlotLink">Create Exam Slot</a>
         <!-- Slot Course Details Modal -->
-        <div id="slotCoursesModal" class="modal modal-z-3000 modal-backdrop-black-5 overflow-auto">
-            <div class="modal-content-wide">
-                <span id="closeSlotCoursesModal" class="close-modal-x close-modal-x-lg">&times;</span>
-                <div id="slotCoursesModalContent">
+        <div id="slotCoursesModal" class="global-modal-backdrop">
+            <div class="global-modal-content wide">
+                <div class="modal-header-std">
                     <h2>Slot Courses</h2>
-                    <div>Loading...</div>
+                    <button type="button" class="close-global-modal">&times;</button>
+                </div>
+                <div class="modal-body-std">
+                    <div id="slotCoursesModalContent">
+                        <div>Loading...</div>
+                    </div>
                 </div>
             </div>
         </div>

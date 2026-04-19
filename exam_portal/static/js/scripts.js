@@ -172,7 +172,13 @@ document.addEventListener('click', function(e) {
             document.getElementById('edit_examname').value = row.children[1].textContent.trim();
             document.getElementById('edit_academic_year').value = row.children[2].textContent.trim();
             document.getElementById('edit_semester').value = row.children[3].textContent.trim();
-            // Dates might need parsing if format is DD-MMM-YYYY
+            
+            // Dates require YYYY-MM-DD format for input[type="date"]
+            const startDate = row.children[4].dataset.raw || '';
+            const endDate = row.children[5].dataset.raw || '';
+            document.getElementById('edit_start_date').value = startDate;
+            document.getElementById('edit_end_date').value = endDate;
+
             toggleGlobalModal('editExamModal', true);
         }
     }
@@ -733,294 +739,91 @@ function clearExaminationForm() {
         endInput.min = startInput.min;
     }
 }
-// Save Examination Edit AJAX
-var saveEditExamBtn = document.getElementById('saveEditExamBtn');
-if (saveEditExamBtn) {
-    saveEditExamBtn.onclick = function (e) {
-        e.preventDefault();
-        const examId = document.getElementById('editExamId').value;
-        const examName = document.getElementById('edit_examname').value.trim();
-        const academicYear = document.getElementById('edit_academic_year').value;
-        const semester = document.getElementById('edit_semester').value;
-        const startDate = document.getElementById('edit_start_date').value;
-        const endDate = document.getElementById('edit_end_date').value;
-        // Validate fields
-        if (!examName || !academicYear || !semester || !startDate || !endDate) {
-            alert('Please fill all fields.');
-            return;
-        }
-        // Send AJAX request to update exam
-        fetch('/ops/ajax/edit-examination/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            },
-            body: JSON.stringify({
-                exam_id: examId,
-                examname: examName,
-                academic_year: academicYear,
-                semester: semester,
-                start_date: startDate,
-                end_date: endDate
-            })
-        })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    showPopupMessage('Examination updated successfully.', 'success');
-                    toggleGlobalModal('editExamModal', false);
-                    fetchExaminations();
-                } else {
-                    showPopupMessage(data.error || 'Failed to update examination.', 'error');
-                }
-            })
-            .catch(() => {
-                showPopupMessage('Network error. Please try again.', 'error');
-            });
-    };
-}
-// --- Student ID Autocomplete and Search ---
-var studentIdList = [];
-var selectedStudentId = '';
-
-function fetchStudentIdAutocomplete(query) {
-    if (!query) {
-        document.getElementById('studentIdAutocomplete').style.display = 'none';
-        return;
-    }
-    fetch(`/masters/ajax/?type=student-id-autocomplete&q=${encodeURIComponent(query)}`)
-        .then(resp => resp.json())
-        .then(data => {
-            studentIdList = data.results || [];
-            const listDiv = document.getElementById('studentIdAutocomplete');
-            if (!studentIdList.length) {
-                listDiv.style.display = 'none';
-                return;
-            }
-            listDiv.innerHTML = studentIdList.map((item, idx) => `<div class="autocomplete-item" data-id="${item.id}" data-idx="${idx}" tabindex="0">${item.id} - ${item.name}</div>`).join('');
-            listDiv.style.display = 'block';
-        });
-}
-
-var searchStudentIdElem = document.getElementById('searchStudentId');
-if (searchStudentIdElem) {
-    searchStudentIdElem.addEventListener('input', function (e) {
-        fetchStudentIdAutocomplete(this.value);
-        selectedStudentId = '';
-    });
-    searchStudentIdElem.addEventListener('keydown', function (e) {
-        const listDiv = document.getElementById('studentIdAutocomplete');
-        if (listDiv.style.display !== 'block') return;
-        const items = Array.from(listDiv.querySelectorAll('.autocomplete-item'));
-        let idx = items.findIndex(item => item.classList.contains('selected'));
-        if (e.key === 'ArrowDown') {
-            if (idx < items.length - 1) idx++;
-            else idx = 0;
-            items.forEach(item => item.classList.remove('selected'));
-            items[idx].classList.add('selected');
-            items[idx].focus();
-            e.preventDefault();
-        } else if (e.key === 'ArrowUp') {
-            if (idx > 0) idx--;
-            else idx = items.length - 1;
-            items.forEach(item => item.classList.remove('selected'));
-            items[idx].classList.add('selected');
-            items[idx].focus();
-            e.preventDefault();
-        } else if (e.key === 'Enter') {
-            if (idx >= 0) {
-                selectedStudentId = items[idx].dataset.id;
-                this.value = items[idx].textContent.split(' - ')[0];
-                listDiv.style.display = 'none';
-                e.preventDefault();
-            }
-        }
-    });
-
-}
-
-var studentIdAutocompleteElem = document.getElementById('studentIdAutocomplete');
-if (studentIdAutocompleteElem) {
-    studentIdAutocompleteElem.addEventListener('mousedown', function (e) {
-        if (e.target.classList.contains('autocomplete-item')) {
-            selectedStudentId = e.target.dataset.id;
-            if (searchStudentIdElem) {
-                searchStudentIdElem.value = e.target.textContent.split(' - ')[0];
-            }
-            this.style.display = 'none';
-        }
-    });
-}
-
-var searchStudentBtnElem = document.getElementById('searchStudentBtn');
-if (searchStudentBtnElem) {
-    searchStudentBtnElem.addEventListener('click', function () {
-        const studentId = selectedStudentId || (searchStudentIdElem ? searchStudentIdElem.value.trim() : '');
-        if (!studentId) {
-            alert('Please enter or select a student ID.');
-            return;
-        }
-        fetch(`/masters/ajax/?type=coursereg&student_id=${encodeURIComponent(studentId)}`)
-            .then(resp => resp.json())
-            .then(data => {
-                document.getElementById('coursereg-list').innerHTML = data.table_html;
-                document.getElementById('courseregTableContainer').style.display = '';
-            });
-    });
-}
-
-var resetStudentSearchBtnElem = document.getElementById('resetStudentSearchBtn');
-if (resetStudentSearchBtnElem) {
-    resetStudentSearchBtnElem.addEventListener('click', function () {
-        if (searchStudentIdElem) searchStudentIdElem.value = '';
-        if (studentIdAutocompleteElem) studentIdAutocompleteElem.style.display = 'none';
-        selectedStudentId = '';
-        var courseregTableContainerElem = document.getElementById('courseregTableContainer');
-        if (courseregTableContainerElem) courseregTableContainerElem.style.display = 'none';
-    });
-}
-// Fix ReferenceError: define startDateRaw and endDateRaw before using them
-var startDateRaw = '';
-var endDateRaw = '';
-// Optionally, fetch values from a triggering element or another source
-var editStartDateElem = document.getElementById('edit_start_date');
-var editEndDateElem = document.getElementById('edit_end_date');
-if (editStartDateElem) {
-    editStartDateElem.value = startDateRaw.match(/^\d{4}-\d{2}-\d{2}$/) ? startDateRaw : '';
-}
-if (editEndDateElem) {
-    editEndDateElem.value = endDateRaw.match(/^\d{4}-\d{2}-\d{2}$/) ? endDateRaw : '';
-}
-var closeEditExamModal = document.getElementById('closeEditExamModal');
-if (closeEditExamModal) {
-    closeEditExamModal.onclick = function () {
-        toggleGlobalModal('editExamModal', false);
-    };
-}
-var cancelEditExamBtn = document.getElementById('cancelEditExamBtn');
-if (cancelEditExamBtn) {
-    cancelEditExamBtn.onclick = function (e) {
-        e.preventDefault();
-        toggleGlobalModal('editExamModal', false);
-    };
-}
-var editExamModal = document.getElementById('editExamModal');
-if (editExamModal) {
-    editExamModal.onclick = function (e) {
-        if (e.target === this) this.style.display = 'none';
-    };
-}
-// Delete Exam AJAX submit
-var deleteExamForm = document.getElementById('deleteExamForm');
-if (deleteExamForm) {
-    deleteExamForm.onsubmit = function (e) {
-        e.preventDefault();
-        const examId = document.getElementById('deleteExamId').value;
-        fetch('/ops/ajax/delete-examination/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            },
-            body: JSON.stringify({ exam_id: examId })
-        })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    toggleGlobalModal('deleteExamModal', false);
-                    showPopupMessage('Examination deleted successfully.', 'success');
-                    fetchExaminations();
-                } else {
-                    showPopupMessage('Failed to delete examination: ' + (data.error || 'Unknown error'), 'error');
-                }
-            })
-            .catch(() => {
-                toggleGlobalModal('deleteExamModal', false);
-                showPopupMessage('Failed to delete examination due to network error.', 'error');
-            });
-    };
-}
+// Final consolidated handling of Exam management is now done via global listeners (Lines 164-251)
+// to prevent conflicting 'onclick' handlers and 'display: none' inline-style overrides.
 // ============ EXAM SLOT TABLE AJAX (operations/exams.html) ============
 function fetchExamSlotsAjax() {
-        // Room Assignment badge AJAX modal logic
-        document.addEventListener('click', function(e) {
-            const roomBadge = e.target.closest('.room-assignment-badge');
-            if (roomBadge) {
-                e.preventDefault();
-                const slotId = roomBadge.getAttribute('data-slot-id');
-                // Modal elements (reuse or create if not present)
-                let modal = document.getElementById('roomAllocModal');
-                let modalContent = document.getElementById('roomAllocModalContent');
-                if (!modal) {
-                    modal = document.createElement('div');
-                    modal.id = 'roomAllocModal';
-                    modal.className = 'modal';
-                    modal.style.display = 'none';
-                    modal.innerHTML = `<div class="modal-content">
-                        <span id="closeRoomAllocModal">&times;</span>
-                        <div id="roomAllocModalContent"><h2>Allocated Rooms</h2><div>Loading...</div></div>
+    // Standardized popup info helper
+    function getPopupSlotInfoHTML(slot) {
+        return `
+            <div class='mb-1em popup-slot-info' style='background:#f8fafc; border-radius:12px; padding:15px; border:1px solid #e2e8f0; margin-bottom:20px;'>
+                <div style='display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:10px;'>
+                    <div><span class='popup-slot-label'>Exam:</span> <span class='popup-slot-value'>${slot.exam_type}</span></div>
+                    <div><span class='popup-slot-label'>Mode:</span> <span class='popup-slot-value'>${slot.mode}</span></div>
+                    <div><span class='popup-slot-label'>Date:</span> <span class='popup-slot-value'>${slot.exam_date}</span></div>
+                    <div><span class='popup-slot-label'>Time:</span> <span class='popup-slot-value'>${slot.start_time}-${slot.end_time}</span></div>
+                    <div><span class='popup-slot-label'>Slot:</span> <span class='popup-slot-value'>${slot.slot_code}</span></div>
+                </div>
+            </div>`;
+    }
+
+    // Combined Trigger Handler for all Exam Management Popups
+    document.addEventListener('click', function(e) {
+        // 1. Room Assignment Popup
+        const roomTrigger = e.target.closest('.room-assignment-badge') || 
+                           (e.target.closest('a[href*="/ops/exam_rooms_alloc/"]') && e.target.closest('a').querySelector('.exam-status-available'));
+        
+        if (roomTrigger) {
+            e.preventDefault();
+            const badgeElement = e.target.closest('.room-assignment-badge') || e.target.closest('a').querySelector('.exam-status-available');
+            const slotId = badgeElement.getAttribute('data-slot-id') || 
+                          e.target.closest('tr').querySelector('.slot-courses-badge')?.getAttribute('data-slot-id');
+
+            if (!slotId) return;
+
+            let modal = document.getElementById('roomAllocModal');
+            let modalContent = document.getElementById('roomAllocModalContent');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'roomAllocModal';
+                modal.className = 'global-modal-backdrop';
+                modal.innerHTML = `
+                    <div class="global-modal-content wide">
+                        <div class="modal-header-std">
+                            <h2>Allocated Rooms</h2>
+                            <button type="button" class="close-global-modal">&times;</button>
+                        </div>
+                        <div class="modal-body-std">
+                            <div id="roomAllocModalContent">Loading...</div>
+                        </div>
                     </div>`;
-                    document.body.appendChild(modal);
-                    modalContent = document.getElementById('roomAllocModalContent');
-                }
-                modal.style.display = 'flex';
-                modalContent.innerHTML = '<h2>Allocated Rooms</h2><div>Loading...</div>';
-                fetch(`/ops/ajax/slot-rooms/?slot_id=${slotId}`)
-                    .then(resp => resp.json())
-                    .then(data => {
-                        if (!data.success) {
-                            modalContent.innerHTML = `<div class='popup-message popup-error'>${data.error || 'No allocated rooms found.'}</div>`;
-                            return;
-                        }
-                        let html = '';
-                        // Slot info
-                        html += `<div class='mb-1em popup-slot-info'>`;
-                        html += `<span class='popup-slot-label'>Exam Type:</span> <span class='popup-slot-value'>${data.slot.exam_type || ''}</span>`;
-                        html += `<span class='popup-slot-label'>Mode:</span> <span class='popup-slot-value'>${data.slot.mode || ''}</span>`;
-                        html += `<span class='popup-slot-label'>Date:</span> <span class='popup-slot-value'>${data.slot.exam_date}</span>`;
-                        html += `<span class='popup-slot-label'>Time:</span> <span class='popup-slot-value'>${data.slot.start_time}-${data.slot.end_time}</span>`;
-                        html += `<span class='popup-slot-label'>Slot Code:</span> <span class='popup-slot-value'>${data.slot.slot_code || ''}</span>`;
-                        html += `</div>`;
-                        // Show required and allocated summary
-                        html += `<div class='room-capacity-summary-wrapper' style='margin-bottom:1em;'>`;
-                        html += `<span class='room-capacity-summary-item room-capacity-summary-flex'><span class='room-capacity-summary-label'>Required Rooms | Capacity:</span> <span class='room-capacity-summary-value required'>${data.required_room_count} | ${data.required_capacity}</span></span>`;
-                        html += `<span class='room-capacity-summary-item room-capacity-summary-flex'><span class='room-capacity-summary-label'>Allocated Rooms | Capacity:</span> <span class='room-capacity-summary-value selected'>${data.allocated_room_count} | ${data.allocated_capacity}</span></span>`;
-                        html += `</div>`;
-                        // Edit buttons
-                        html += `<div class="popup-edit-btn-container">`;
-                        html += `<a href=\"/ops/exam_rooms_alloc/?slot_id=${slotId}\" class="popup-edit-btn badge" style="background:#2563eb;color:#fff;text-decoration:none;">Edit Rooms</a>`;
-                        html += `</div>`;
-                        // Rooms table
-                        if (!data.rooms || data.rooms.length === 0) {
-                            html += `<div>No rooms allocated for this slot.</div>`;
-                        } else {
-                            html += `<div class='dashboard-popup-table-wrapper'><table class='dashboard-popup-table'>`;
-                            html += `<thead><tr><th>Room No</th><th>Room Type</th><th>Capacity</th><th>Block</th></tr></thead><tbody>`;
-                            data.rooms.forEach(function (room) {
-                                html += `<tr>`;
-                                html += `<td>${room.room_no ? room.room_no : 'N/A'}</td>`;
-                                html += `<td>${room.room_type ? room.room_type : 'N/A'}</td>`;
-                                html += `<td>${room.capacity !== undefined && room.capacity !== null && room.capacity !== '' ? room.capacity : 'N/A'}</td>`;
-                                html += `<td>${room.block ? room.block : 'N/A'}</td>`;
-                                html += `</tr>`;
-                            });
-                            html += `</tbody></table></div>`;
-                        }
-                        modalContent.innerHTML = html;
-                    })
-                    .catch(() => {
-                        modalContent.innerHTML = `<div class='popup-message popup-error'>Failed to load room details (network error).</div>`;
-                    });
-                // Close logic
-                document.getElementById('closeRoomAllocModal').onclick = function () {
-                    modal.style.display = 'none';
-                };
-                modal.onclick = function (evt) {
-                    if (evt.target === modal) modal.style.display = 'none';
-                };
+                document.body.appendChild(modal);
+                modalContent = document.getElementById('roomAllocModalContent');
             }
-        });
+            toggleGlobalModal('roomAllocModal', true);
+            modalContent.innerHTML = '<div class="text-center">Loading room details...</div>';
+
+            fetch(`/ops/ajax/slot-rooms/?slot_id=${slotId}`)
+                .then(resp => resp.json())
+                .then(data => {
+                    if (!data.success) {
+                        modalContent.innerHTML = `<div class='popup-message popup-error'>${data.error || 'No allocated rooms found.'}</div>`;
+                        return;
+                    }
+                    let html = getPopupSlotInfoHTML(data.slot);
+                    html += `<div class="popup-edit-btn-container"><a href="/ops/exam_rooms_alloc/?slot_id=${slotId}" class="btn-std btn-primary" style="text-decoration:none;">Update Allocation</a></div>`;
+                    
+                    if (!data.rooms || data.rooms.length === 0) {
+                        html += `<div class="text-center p-20">No rooms allocated for this slot.</div>`;
+                    } else {
+                        html += `<div class='modal-table-container'><table class='dashboard-popup-table'>
+                                    <thead><tr><th>Room No</th><th>Type</th><th>Capacity</th><th>Block</th></tr></thead>
+                                    <tbody>`;
+                        data.rooms.forEach(room => {
+                            html += `<tr>
+                                        <td>${room.room_no || 'N/A'}</td>
+                                        <td>${room.room_type || 'N/A'}</td>
+                                        <td>${room.capacity || 'N/A'}</td>
+                                        <td>${room.block || 'N/A'}</td>
+                                    </tr>`;
+                        });
+                        html += `</tbody></table></div>`;
+                    }
+                    modalContent.innerHTML = html;
+                })
+                .catch(() => modalContent.innerHTML = `<div class='popup-message popup-error'>Failed to load room details.</div>`);
+        }
+    });
     // Slot courses badge click handler (delegated)
     document.addEventListener('click', function (e) {
         // Always handle publish badge first
@@ -1077,17 +880,17 @@ function fetchExamSlotsAjax() {
                                     });
                                     return;
                                 }
-        // Ensure preventDefault is called before navigation
-        if (e.defaultPrevented) return;
-        const badge = e.target.closest('.slot-courses-badge');
-        if (badge) {
+        // 2. Slot courses badge click handler
+        const courseBadgeTrigger = e.target.closest('.slot-courses-badge');
+        if (courseBadgeTrigger) {
             e.preventDefault();
-            const slotId = badge.getAttribute('data-slot-id');
+            const slotId = courseBadgeTrigger.getAttribute('data-slot-id');
             if (!slotId) return;
-            const modal = document.getElementById('slotCoursesModal');
+            
+            toggleGlobalModal('slotCoursesModal', true);
             const modalContent = document.getElementById('slotCoursesModalContent');
-            modal.style.display = 'flex';
-            modalContent.innerHTML = '<h2>Slot Courses</h2><div>Loading...</div>';
+            modalContent.innerHTML = '<div class="text-center p-20">Loading course details...</div>';
+            
             fetch(`/ops/ajax/slot-courses/?slot_id=${slotId}`)
                 .then(resp => resp.json())
                 .then(data => {
@@ -1095,207 +898,91 @@ function fetchExamSlotsAjax() {
                         modalContent.innerHTML = `<div class='popup-message popup-error'>${data.error || 'Failed to load course details.'}</div>`;
                         return;
                     }
-                    let html = '';
-                    // Slot info
-                    html += `<div class='mb-1em popup-slot-info'>`;
-                    html += `<span class='popup-slot-label'>Exam Type:</span> <span class='popup-slot-value'>${data.slot.exam_type || ''}</span>`;
-                    html += `<span class='popup-slot-label'>Mode:</span> <span class='popup-slot-value'>${data.slot.mode || ''}</span>`;
-                    html += `<span class='popup-slot-label'>Date:</span> <span class='popup-slot-value'>${data.slot.exam_date}</span>`;
-                    html += `<span class='popup-slot-label'>Time:</span> <span class='popup-slot-value'>${data.slot.start_time}-${data.slot.end_time}</span>`;
-                    html += `<span class='popup-slot-label'>Slot Code:</span> <span class='popup-slot-value'>${data.slot.slot_code || ''}</span>`;
-                    html += `</div>`;
-                    // Courses table
+                    let html = getPopupSlotInfoHTML(data.slot);
                     if (data.courses.length === 0) {
-                        html += `<div>No courses assigned to this slot.</div>`;
+                        html += `<div class="text-center p-20">No courses assigned to this slot.</div>`;
                     } else {
-                        html += `<table class='dashboard-popup-table'>`;
-                        html += `<thead><tr><th>Course Code</th><th>Course Name</th><th>Regulation</th><th>Academic Year</th><th>Semester</th><th>Student Count</th></tr></thead><tbody>`;
-                        data.courses.forEach(function (course) {
-                            html += `<tr>`;
-                            html += `<td>${course.course_code}</td>`;
-                            html += `<td>${course.course_name}</td>`;
-                            html += `<td>${course.regulation || ''}</td>`;
-                            html += `<td>${course.academic_year || ''}</td>`;
-                            html += `<td>${course.semester || ''}</td>`;
-                            html += `<td>${course.student_count}</td>`;
-                            html += `</tr>`;
+                        html += `<div class='modal-table-container'><table class='dashboard-popup-table'>
+                                    <thead><tr><th>Course Code</th><th>Course Name</th><th>Regulation</th><th>AY</th><th>Sem</th><th>Students</th></tr></thead>
+                                    <tbody>`;
+                        data.courses.forEach(course => {
+                            html += `<tr>
+                                        <td>${course.course_code}</td>
+                                        <td>${course.course_name}</td>
+                                        <td>${course.regulation || 'N/A'}</td>
+                                        <td>${course.academic_year || 'N/A'}</td>
+                                        <td>${course.semester || 'N/A'}</td>
+                                        <td><strong>${course.student_count}</strong></td>
+                                    </tr>`;
                         });
-                        html += `</tbody></table>`;
+                        html += `</tbody></table></div>`;
                     }
                     modalContent.innerHTML = html;
                 })
-                .catch(() => {
-                    modalContent.innerHTML = `<div class='popup-message popup-error'>Failed to load course details (network error).</div>`;
-                });
-            return;
+                .catch(() => modalContent.innerHTML = `<div class='popup-message popup-error'>Failed to load course details.</div>`);
         }
 
-        // Room allocation badge modal logic
-                // Faculty assignment badge modal logic
-                const facultyAllocLink = e.target.closest('a[href*="/ops/exam_faculty_alloc/"]');
-                if (facultyAllocLink) {
-                    // Only trigger modal if badge is 'Assigned'
-                    const badge = facultyAllocLink.querySelector('.exam-status.exam-status-available');
-                    if (badge) {
-                        e.preventDefault();
-                        const row = facultyAllocLink.closest('tr');
-                        const slotId = row ? row.querySelector('.slot-courses-badge')?.getAttribute('data-slot-id') : null;
-                        // Fallback: try to extract slotId from URL
-                        let slotIdUrl = null;
-                        if (!slotId) {
-                            const urlParams = new URLSearchParams(facultyAllocLink.href.split('?')[1]);
-                            slotIdUrl = urlParams.get('slot_id');
-                        }
-                        const finalSlotId = slotId || slotIdUrl;
-                        // Modal elements (reuse or create if not present)
-                        let modal = document.getElementById('facultyAllocModal');
-                        let modalContent = document.getElementById('facultyAllocModalContent');
-                        if (!modal) {
-                            modal = document.createElement('div');
-                            modal.id = 'facultyAllocModal';
-                            modal.className = 'global-modal-backdrop';
-                            modal.innerHTML = `
-                                <div class="global-modal-content">
-                                    <div class="modal-header-std">
-                                        <h2>Assigned Faculty</h2>
-                                        <button type="button" class="close-global-modal">&times;</button>
-                                    </div>
-                                    <div class="modal-body-std modal-table-container">
-                                        <div id="facultyAllocModalContent">Loading...</div>
-                                    </div>
-                                </div>`;
-                            document.body.appendChild(modal);
-                            modalContent = document.getElementById('facultyAllocModalContent');
-                        }
-                        toggleGlobalModal('facultyAllocModal', true);
-                        modalContent.innerHTML = '<div>Loading...</div>';
-                        fetch(`/ops/ajax/slot-faculty/?slot_id=${finalSlotId}`)
-                            .then(resp => resp.json())
-                            .then(data => {
-                                if (!data.success) {
-                                    modalContent.innerHTML = `<div class='popup-message popup-error'>${data.error || 'No assigned faculty found.'}</div>`;
-                                    return;
-                                }
-                                let html = '';
-                                // Slot info with extra margin below
-                                html += `<div class='mb-1em popup-slot-info'>`;
-                                html += `<span class='popup-slot-label'>Exam Type:</span> <span class='popup-slot-value'>${data.slot.exam_type || 'N/A'}</span>`;
-                                html += `<span class='popup-slot-label'>Mode:</span> <span class='popup-slot-value'>${data.slot.mode || 'N/A'}</span>`;
-                                html += `<span class='popup-slot-label'>Date:</span> <span class='popup-slot-value'>${data.slot.exam_date || 'N/A'}</span>`;
-                                html += `<span class='popup-slot-label'>Time:</span> <span class='popup-slot-value'>${data.slot.start_time || 'N/A'}-${data.slot.end_time || 'N/A'}</span>`;
-                                html += `<span class='popup-slot-label'>Slot Code:</span> <span class='popup-slot-value'>${data.slot.slot_code || 'N/A'}</span>`;
-                                html += `</div>`;
-                                // Edit buttons
-                                html += `<div class="popup-edit-btn-container">`;
-                                html += `<a href=\"/ops/exam_faculty_alloc/?slot_id=${finalSlotId}\" class="popup-edit-btn badge" style="background:#2563eb;color:#fff;text-decoration:none;">Edit Faculty</a>`;
-                                html += `</div>`;
-                                // Faculty table
-                                if (!data.faculty || data.faculty.length === 0) {
-                                    html += `<div>No faculty assigned for this slot.</div>`;
-                                } else {
-                                    html += `<div class='dashboard-popup-table-wrapper'><table class='dashboard-popup-table'>`;
-                                    html += `<thead><tr><th>Faculty ID</th><th>Name</th><th>Email</th><th>Department</th></tr></thead><tbody>`;
-                                    data.faculty.forEach(function (fac) {
-                                        html += `<tr>`;
-                                        html += `<td>${fac.faculty_id ? fac.faculty_id : 'N/A'}</td>`;
-                                        html += `<td>${fac.faculty_name ? fac.faculty_name : 'N/A'}</td>`;
-                                        html += `<td>${fac.email ? fac.email : 'N/A'}</td>`;
-                                        html += `<td>${fac.dept ? fac.dept : 'N/A'}</td>`;
-                                        html += `</tr>`;
-                                    });
-                                    html += `</tbody></table></div>`;
-                                }
-                                modalContent.innerHTML = html;
-                            })
-                            .catch(() => {
-                                modalContent.innerHTML = `<div class='popup-message popup-error'>Failed to load faculty details (network error).</div>`;
-                            });
-                    }
-                }
-        const roomAllocLink = e.target.closest('a[href*="/ops/exam_rooms_alloc/"]');
-        if (roomAllocLink) {
-            // Only trigger modal if badge is 'Assigned'
-            const badge = roomAllocLink.querySelector('.exam-status.exam-status-available');
-            if (badge) {
-                e.preventDefault();
-                const row = roomAllocLink.closest('tr');
-                const slotId = row ? row.querySelector('.slot-courses-badge')?.getAttribute('data-slot-id') : null;
-                // Fallback: try to extract slotId from URL
-                let slotIdUrl = null;
-                if (!slotId) {
-                    const urlParams = new URLSearchParams(roomAllocLink.href.split('?')[1]);
-                    slotIdUrl = urlParams.get('slot_id');
-                }
-                const finalSlotId = slotId || slotIdUrl;
-                // Modal elements (reuse or create if not present)
-                let modal = document.getElementById('roomAllocModal');
-                let modalContent = document.getElementById('roomAllocModalContent');
-                if (!modal) {
-                    modal = document.createElement('div');
-                    modal.id = 'roomAllocModal';
-                    modal.className = 'global-modal-backdrop';
-                    modal.innerHTML = `
-                        <div class="global-modal-content">
-                            <div class="modal-header-std">
-                                <h2>Allocated Rooms</h2>
-                                <button type="button" class="close-global-modal">&times;</button>
-                            </div>
-                            <div class="modal-body-std modal-table-container">
-                                <div id="roomAllocModalContent">Loading...</div>
-                            </div>
-                        </div>`;
-                    document.body.appendChild(modal);
-                    modalContent = document.getElementById('roomAllocModalContent');
-                }
-                toggleGlobalModal('roomAllocModal', true);
-                modalContent.innerHTML = '<div>Loading...</div>';
-                fetch(`/ops/ajax/slot-rooms/?slot_id=${finalSlotId}`)
-                    .then(resp => resp.json())
-                    .then(data => {
-                        if (!data.success) {
-                            modalContent.innerHTML = `<div class='popup-message popup-error'>${data.error || 'No allocated rooms found.'}</div>`;
-                            return;
-                        }
-                        let html = '';
-                        // Slot info
-                        html += `<div class='mb-1em popup-slot-info'>`;
-                        html += `<span class='popup-slot-label'>Exam Type:</span> <span class='popup-slot-value'>${data.slot.exam_type || ''}</span>`;
-                        html += `<span class='popup-slot-label'>Mode:</span> <span class='popup-slot-value'>${data.slot.mode || ''}</span>`;
-                        html += `<span class='popup-slot-label'>Date:</span> <span class='popup-slot-value'>${data.slot.exam_date}</span>`;
-                        html += `<span class='popup-slot-label'>Time:</span> <span class='popup-slot-value'>${data.slot.start_time}-${data.slot.end_time}</span>`;
-                        html += `<span class='popup-slot-label'>Slot Code:</span> <span class='popup-slot-value'>${data.slot.slot_code || ''}</span>`;
-                        html += `</div>`;
-                        // Show required and allocated summary
-                        html += `<div class='room-capacity-summary-wrapper' style='margin-bottom:1em;'>`;
-                        html += `<span class='room-capacity-summary-item room-capacity-summary-flex'><span class='room-capacity-summary-label'>Required Rooms | Capacity:</span> <span class='room-capacity-summary-value required'>${data.required_room_count} | ${data.required_capacity}</span></span>`;
-                        html += `<span class='room-capacity-summary-item room-capacity-summary-flex'><span class='room-capacity-summary-label'>Allocated Rooms | Capacity:</span> <span class='room-capacity-summary-value selected'>${data.allocated_room_count} | ${data.allocated_capacity}</span></span>`;
-                        html += `</div>`;
-                        // Edit buttons
-                        html += `<div class="popup-edit-btn-container">`;
-                        html += `<a href=\"/ops/exam_rooms_alloc/?slot_id=${finalSlotId}\" class="popup-edit-btn badge" style="background:#2563eb;color:#fff;text-decoration:none;">Edit Rooms</a>`;
-                        html += `</div>`;
-                        // Rooms table
-                        if (!data.rooms || data.rooms.length === 0) {
-                            html += `<div>No rooms allocated for this slot.</div>`;
-                        } else {
-                            html += `<div class='dashboard-popup-table-wrapper'><table class='dashboard-popup-table'>`;
-                            html += `<thead><tr><th>Room No</th><th>Room Type</th><th>Capacity</th><th>Block</th></tr></thead><tbody>`;
-                            data.rooms.forEach(function (room) {
-                                html += `<tr>`;
-                                html += `<td>${room.room_no ? room.room_no : 'N/A'}</td>`;
-                                html += `<td>${room.room_type ? room.room_type : 'N/A'}</td>`;
-                                html += `<td>${room.capacity !== undefined && room.capacity !== null && room.capacity !== '' ? room.capacity : 'N/A'}</td>`;
-                                html += `<td>${room.block ? room.block : 'N/A'}</td>`;
-                                html += `</tr>`;
-                            });
-                            html += `</tbody></table></div>`;
-                        }
-                        modalContent.innerHTML = html;
-                    })
-                    .catch(() => {
-                        modalContent.innerHTML = `<div class='popup-message popup-error'>Failed to load room details (network error).</div>`;
-                    });
+        // 3. Faculty Assignment Popup
+        const facultyTrigger = e.target.closest('a[href*="/ops/exam_faculty_alloc/"]') && e.target.closest('a').querySelector('.exam-status-available');
+        if (facultyTrigger) {
+            e.preventDefault();
+            const badgeElement = e.target.closest('a').querySelector('.exam-status-available');
+            const row = e.target.closest('tr');
+            const slotId = badgeElement.getAttribute('data-slot-id') || row?.querySelector('.slot-courses-badge')?.getAttribute('data-slot-id');
+
+            if (!slotId) return;
+
+            let modal = document.getElementById('facultyAllocModal');
+            let modalContent = document.getElementById('facultyAllocModalContent');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'facultyAllocModal';
+                modal.className = 'global-modal-backdrop';
+                modal.innerHTML = `
+                    <div class="global-modal-content wide">
+                        <div class="modal-header-std">
+                            <h2>Assigned Faculty</h2>
+                            <button type="button" class="close-global-modal">&times;</button>
+                        </div>
+                        <div class="modal-body-std">
+                            <div id="facultyAllocModalContent">Loading...</div>
+                        </div>
+                    </div>`;
+                document.body.appendChild(modal);
+                modalContent = document.getElementById('facultyAllocModalContent');
             }
+            toggleGlobalModal('facultyAllocModal', true);
+            modalContent.innerHTML = '<div class="text-center">Loading faculty details...</div>';
+
+            fetch(`/ops/ajax/slot-faculty/?slot_id=${slotId}`)
+                .then(resp => resp.json())
+                .then(data => {
+                    if (!data.success) {
+                        modalContent.innerHTML = `<div class='popup-message popup-error'>${data.error || 'No assigned faculty found.'}</div>`;
+                        return;
+                    }
+                    let html = getPopupSlotInfoHTML(data.slot);
+                    html += `<div class="popup-edit-btn-container"><a href="/ops/exam_faculty_alloc/?slot_id=${slotId}" class="btn-std btn-primary" style="text-decoration:none;">Update Faculty</a></div>`;
+                    
+                    if (!data.faculty || data.faculty.length === 0) {
+                        html += `<div class="text-center p-20">No faculty assigned for this slot.</div>`;
+                    } else {
+                        html += `<div class='modal-table-container'><table class='dashboard-popup-table'>
+                                    <thead><tr><th>Faculty ID</th><th>Name</th><th>Email</th><th>Department</th></tr></thead>
+                                    <tbody>`;
+                        data.faculty.forEach(fac => {
+                            html += `<tr>
+                                        <td>${fac.faculty_id || 'N/A'}</td>
+                                        <td>${fac.faculty_name || 'N/A'}</td>
+                                        <td>${fac.email || 'N/A'}</td>
+                                        <td>${fac.dept || 'N/A'}</td>
+                                    </tr>`;
+                        });
+                        html += `</tbody></table></div>`;
+                    }
+                    modalContent.innerHTML = html;
+                })
+                .catch(() => modalContent.innerHTML = `<div class='popup-message popup-error'>Failed to load faculty details.</div>`);
         }
     });
     // Close modal logic handled globally
@@ -1361,52 +1048,51 @@ function fetchExamSlotsAjax() {
                 data.slots.forEach(function (slot) {
                     let statusCell = '';
                     const schedUrl = `/ops/exam-scheduling/${slot.id}/`;
-                    if (slot.assignment_status === 'Assigned') {
+                    // Use 'courses_completed' flag from backend
+                    if (slot.courses_completed) {
                         statusCell = `<td><a href="${schedUrl}" class="slot-schedule-link" title="Go to scheduling"><span class="exam-status exam-status-available">Assigned <img src='https://img.icons8.com/?size=100&id=79211&format=png&color=000000' alt='Assigned' class='status-icon'></span></a></td>`;
                     } else {
                         statusCell = `<td><a href="${schedUrl}" class="slot-schedule-link" title="Go to scheduling"><span class="exam-status exam-status-pending">Pending <img src='https://img.icons8.com/?size=100&id=rKEYSosGdrkP&format=png&color=000000' alt='Pending' class='status-icon'></span></a></td>`;
                     }
+
                     // Add edit and delete links
                     const editLink = `<a href="#" class="edit-slot-btn" data-slot-id="${slot.id}" title="Edit"><img src="https://img.icons8.com/?size=100&id=kzmsQM0bM3Bl&format=png&color=000000" alt="Edit Slot" class="icon-edit"></a>`;
                     const deleteLink = `<a href="#" class="delete-slot-btn" data-slot-id="${slot.id}" data-slot-date="${slot.exam_date}" data-slot-time="${slot.start_time}-${slot.end_time}" data-slot-code="${slot.slot_code}"><img src="https://img.icons8.com/?size=100&id=99971&format=png&color=000000" alt="Delete Slot" class="icon-delete"></a>`;
-                    // Badge for courses
-                    // Show badge as 'count : X', but use red for 0, green for >0
+                    
+                    // Course Count Badge
                     let badgeClass = slot.course_count > 0 ? 'badge-courses badge-courses-positive' : 'badge-courses badge-courses-zero';
-                    courseBadge = `<a href="#" class="slot-courses-badge" data-slot-id="${slot.id}">
+                    let courseBadge = `<a href="#" class="slot-courses-badge" data-slot-id="${slot.id}">
                         <span class="${badgeClass}">count : ${slot.course_count}</span>
                     </a>`;
-                    // Room allocation badge
+
+                    // Room allocation badge - Strict Backend Data
                     let roomBadge = '';
-                    if (slot.assigned_room_count > 0) {
+                    if (slot.rooms_completed) {
                         roomBadge = `<span class="exam-status exam-status-available">Assigned : ${slot.assigned_room_count}</span>`;
                     } else {
                         roomBadge = `<span class="exam-status exam-status-pending">Pending <img src='https://img.icons8.com/?size=100&id=rKEYSosGdrkP&format=png&color=000000' alt='Pending' class='status-icon'></span>`;
                     }
-                    // Faculty assignment badge
+
+                    // Faculty assignment badge - Strict Backend Data
                     let facultyBadge = '';
-                    if (slot.assigned_faculty_count > 0) {
+                    if (slot.faculty_completed) {
                         facultyBadge = `<span class="exam-status exam-status-available">Assigned : ${slot.assigned_faculty_count}</span>`;
                     } else {
                         facultyBadge = `<span class="exam-status exam-status-pending">Pending <img src='https://img.icons8.com/?size=100&id=rKEYSosGdrkP&format=png&color=000000' alt='Pending' class='status-icon'></span>`;
                     }
-                    // Determine status for new column
+
+                    // Final Status Column - Purely Backend Response
                     let newStatusCell = '';
-                    // Show Completed if generated and all assigned
-                    if (slot.is_generated && slot.all_assigned) {
-                        newStatusCell = `<td><span class="exam-status exam-status-available">Completed <span class='status-icon status-tick' aria-label='Completed'><svg viewBox="0 0 16 16" width="17" height="17" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="8" fill="#e6f9e6"/><path d="M4.5 8.5L7 11L11.5 6.5" stroke="#1a7f1a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span></span></td>`;
+                    if (slot.status === 'Publish') {
+                        newStatusCell = `<td><span class="exam-status exam-status-available" title="Updated by ${slot.updated_by}">Completed <span class='status-icon status-tick' aria-label='Completed'><svg viewBox="0 0 16 16" width="17" height="17" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="8" fill="#e6f9e6"/><path d="M4.5 8.5L7 11L11.5 6.5" stroke="#1a7f1a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span></span></td>`;
+                    } else if (slot.rooms_completed && slot.faculty_completed && slot.courses_completed && !slot.seating_completed) {
+                        // All prerequisites done but seating not generated
+                        newStatusCell = `<td><a href="#" class="slot-status-link" title="Status"><span class="exam-status exam-status-generate" title="Updated by ${slot.updated_by}">Generate <img src='https://img.icons8.com/?size=100&id=11841&format=png&color=ff9900' alt='Generate' class='status-icon'></span></a></td>`;
                     } else if (slot.is_generated) {
-                        // If generated but not all assigned, show Update
-                        newStatusCell = `<td><a href="#" class="slot-status-link" title="Status"><span class="exam-status exam-status-available">Update <img src='https://img.icons8.com/?size=100&id=11841&format=png&color=ff9900' alt='Update' class='status-icon'></span></a></td>`;
-                    } else if (
-                        roomBadge.includes('exam-status-available') &&
-                        facultyBadge.includes('exam-status-available') &&
-                        badgeClass.includes('badge-courses-positive')
-                        && !slot.is_generated
-                    ) {
-                        // Only show Generate if all assigned and no backend data
-                        newStatusCell = `<td><a href="#" class="slot-status-link" title="Status"><span class="exam-status exam-status-generate">Generate <img src='https://img.icons8.com/?size=100&id=11841&format=png&color=ff9900' alt='Generate' class='status-icon'></span></a></td>`;
+                        // Seating generated but status is not Publish (likely due to physical record mismatch)
+                        newStatusCell = `<td><a href="#" class="slot-status-link" title="Status"><span class="exam-status exam-status-available" title="Updated by ${slot.updated_by}">Update <img src='https://img.icons8.com/?size=100&id=11841&format=png&color=ff9900' alt='Update' class='status-icon'></span></a></td>`;
                     } else {
-                        newStatusCell = `<td><a href="#" class="slot-status-link" title="Status"><span class="exam-status exam-status-pending">Pending <img src='https://img.icons8.com/?size=100&id=rKEYSosGdrkP&format=png&color=000000' alt='Pending' class='status-icon'></span></a></td>`;
+                        newStatusCell = `<td><a href="#" class="slot-status-link" title="Status"><span class="exam-status exam-status-pending" title="Updated by ${slot.updated_by}">Pending <img src='https://img.icons8.com/?size=100&id=rKEYSosGdrkP&format=png&color=000000' alt='Pending' class='status-icon'></span></a></td>`;
                     }
                     var row = `<tr data-slot-id="${slot.id}">
                         <td>${slot.exam_type || ''}</td>
@@ -1654,7 +1340,11 @@ document.addEventListener('DOMContentLoaded', function () {
                             `&start_date=${encodeURIComponent(exam.start_date)}` +
                             `&end_date=${encodeURIComponent(exam.end_date)}`;
                         const rowId = `exam-row-${exam.exam_id}`;
-                        tbody.innerHTML += `<tr id="${rowId}">
+                        const lockIcon = exam.is_locked ? 'https://img.icons8.com/?size=100&id=DZbPJ4lsqOdQ&format=png&color=000000' : 'https://img.icons8.com/?size=100&id=7Sm4QkMSvsON&format=png&color=000000';
+                        const lockTitle = exam.is_locked ? `Locked by ${exam.locked_by_name} at ${exam.lock_updated_at}` : 'Click to lock';
+                        const lockedClass = exam.is_locked ? 'exam-row-locked' : '';
+                        
+                        tbody.innerHTML += `<tr id="${rowId}" class="${lockedClass}">
                             <td>${exam.number}</td>
                             <td>${exam.exam_name}</td>
                             <td>${exam.academic_year || ''}</td>
@@ -1664,8 +1354,12 @@ document.addEventListener('DOMContentLoaded', function () {
                             <td id="slot-badge-${exam.exam_id}"><a href="${slotLink}" class="slot-link" data-exam-name="${encodeURIComponent(exam.exam_name)}">${pendingBadge()}</a></td>
                             <td id="status-badge-${exam.exam_id}">${pendingBadge()}</td>
                             <td>
-                                <a href="#" class="edit-exam-btn" data-exam-id="${exam.exam_id}" title="Edit"><img src="https://img.icons8.com/?size=100&id=kzmsQM0bM3Bl&format=png&color=000000" alt="Edit Exam" style="width:16px;height:16px;margin-right:6px;"></a>
-                                <a href="#" class="delete-exam-btn" data-exam-id="${exam.exam_id}" data-exam-name="${exam.exam_name}"><img src="https://img.icons8.com/?size=100&id=99971&format=png&color=000000" alt="Delete Exam" style="width:16px;height:16px;"></a>
+                                <!-- Trigger classes standardized for global listener -->
+                                <a href="#" class="lock-toggle-btn" data-exam-id="${exam.exam_id}" data-is-locked="${exam.is_locked}" title="${lockTitle}" style="margin-right:12px;">
+                                    <img src="${lockIcon}" alt="Lock" style="width:20px;height:20px;">
+                                </a>
+                                <a href="#" class="edit-exam-link-trigger ${exam.is_locked ? 'disabled-action' : ''}" data-exam-id="${exam.exam_id}" data-locked="${exam.is_locked}" title="Edit"><img src="https://img.icons8.com/?size=100&id=kzmsQM0bM3Bl&format=png&color=000000" alt="Edit Exam" style="width:20px;height:20px;margin-right:12px;"></a>
+                                <a href="#" class="delete-exam-link-trigger ${exam.is_locked ? 'disabled-action' : ''}" data-exam-id="${exam.exam_id}" data-exam-name="${exam.exam_name}" data-locked="${exam.is_locked}" title="Delete"><img src="https://img.icons8.com/?size=100&id=99971&format=png&color=000000" alt="Delete Exam" style="width:20px;height:20px;"></a>
                             </td>
                         </tr>`;
                         fetch(`/ops/ajax_exam_slots/?exam_id=${exam.exam_id}`)
@@ -1674,18 +1368,34 @@ document.addEventListener('DOMContentLoaded', function () {
                                 const badgeTd = document.getElementById(`slot-badge-${exam.exam_id}`);
                                 const statusTd = document.getElementById(`status-badge-${exam.exam_id}`);
                                 if (badgeTd && slotData.slots && slotData.slots.length > 0) {
-                                    badgeTd.innerHTML = `<a href="${slotLink}" class="slot-link" data-exam-name="${encodeURIComponent(exam.exam_name)}">${availableBadge(slotData.slots.length)}</a>`;
+                                    const slotLinkClass = exam.is_locked ? 'slot-link-locked' : 'slot-link';
+                                    badgeTd.innerHTML = `<a href="${slotLink}" class="${slotLinkClass}" data-exam-name="${encodeURIComponent(exam.exam_name)}" data-locked="${exam.is_locked}">${availableBadge(slotData.slots.length)}</a>`;
                                 }
                                 // Determine if all slots are completed (is_generated and assignments done)
                                 let allCompleted = slotData.slots.length > 0 && slotData.slots.every(s => s.status === 'Publish');
-                                let anyPending = slotData.slots.some(s => s.status !== 'Publish');
                                 if (statusTd) {
-                                    if (exam.published && allCompleted) {
-                                        statusTd.innerHTML = `<span class="exam-status exam-status-available" style="background:#e6f9e6;color:#1a7f1a;padding:2px 10px 2px 10px;border-radius:6px;display:inline-flex;align-items:center;font-weight:600;">Published <img src="https://img.icons8.com/?size=100&id=79211&format=png&color=22c55e" alt="Published" class="status-icon" style="width:1.2em;height:1.2em;vertical-align:middle;margin-left:6px;"></span>`;
-                                    } else if (allCompleted && !exam.published) {
-                                        statusTd.innerHTML = `<a href="#" class="publish-exam-btn" data-exam-id="${exam.exam_id}" style="text-decoration:none;"><span class="exam-status exam-status-publish" style="background:#fff3cd;color:#d97706;padding:2px 10px 2px 10px;border-radius:6px;display:inline-flex;align-items:center;font-weight:600;cursor:pointer;">Publish <img src="https://img.icons8.com/?size=100&id=79211&format=png&color=000000" alt="Publish" class="status-icon" style="width:1.2em;height:1.2em;vertical-align:middle;margin-left:6px;"></span></a>`;
+                                    if (exam.published) {
+                                        // Published Status (Green) - Clicking allows unpublishing if not locked
+                                        statusTd.innerHTML = `
+                                            <a href="#" class="unpublish-exam-btn" data-exam-id="${exam.exam_id}" data-locked="${exam.is_locked}" style="text-decoration:none;">
+                                                <span class="exam-status" style="background:#e6f9e6;color:#1a7f1a;padding:4px 12px;border-radius:12px;display:inline-flex;align-items:center;font-weight:700;box-shadow:0 2px 4px rgba(22,163,74,0.1);">
+                                                    Published <img src="https://img.icons8.com/?size=100&id=79211&format=png&color=16a34a" alt="Published" style="width:1.2em;height:1.2em;margin-left:8px;">
+                                                </span>
+                                            </a>`;
+                                    } else if (allCompleted) {
+                                        // Ready to Publish (Amber) - Show button
+                                        statusTd.innerHTML = `
+                                            <a href="#" class="publish-exam-btn-trigger" data-exam-id="${exam.exam_id}" data-locked="${exam.is_locked}" style="text-decoration:none;">
+                                                <span class="exam-status" style="background:#fff7ed;color:#ea580c;padding:4px 12px;border-radius:12px;display:inline-flex;align-items:center;font-weight:700;border:1.5px solid #fdba74;transition:all 0.2s;">
+                                                    Publish <img src="https://img.icons8.com/?size=100&id=79211&format=png&color=ea580c" alt="Publish" style="width:1.2em;height:1.2em;margin-left:8px;">
+                                                </span>
+                                            </a>`;
                                     } else {
-                                        statusTd.innerHTML = pendingBadge();
+                                        // Incomplete (Grey)
+                                        statusTd.innerHTML = `
+                                            <span class="exam-status" style="background:#f1f5f9;color:#64748b;padding:4px 12px;border-radius:12px;display:inline-flex;align-items:center;font-weight:600;opacity:0.8;">
+                                                Incomplete
+                                            </span>`;
                                     }
                                 }
                             });
@@ -1749,55 +1459,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     } else {
                         detailsHtml += '<b>No slots found for this examination.</b>';
                     }
-                    document.getElementById('deleteExamWarning').innerHTML = `Are you sure you want to delete <b>\"${examName}\"</b>?<br>This will <b>permanently delete</b> all slots and exams scheduled under this examination.`;
-                    document.getElementById('deleteExamDetails').innerHTML = detailsHtml;
-                    document.getElementById('deleteExamId').value = examId;
-                    document.getElementById('deleteExamModal').style.display = 'flex';
                 });
         }
     });
-    // Modal close/cancel logic
-    document.getElementById('closeDeleteExamModal').onclick = function () {
-        document.getElementById('deleteExamModal').style.display = 'none';
-    };
-    document.getElementById('cancelDeleteExamBtn').onclick = function (e) {
-        e.preventDefault();
-        document.getElementById('deleteExamModal').style.display = 'none';
-    };
-    document.getElementById('deleteExamModal').onclick = function (e) {
-        if (e.target === this) this.style.display = 'none';
-    };
-    document.getElementById('confirmDeleteExamLink').onclick = function (e) {
-        e.preventDefault();
-        const examId = document.getElementById('deleteExamId').value;
-        fetch('/ops/ajax/delete-examination/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            },
-            body: JSON.stringify({ exam_id: examId })
-        })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    // Hide modal and clear its content
-                    const modal = document.getElementById('deleteExamModal');
-                    modal.style.display = 'none';
-                    document.getElementById('deleteExamWarning').innerHTML = '';
-                    document.getElementById('deleteExamDetails').innerHTML = '';
-                    document.getElementById('deleteExamId').value = '';
-                    alert('Examination and all related slots and exams deleted successfully.');
-                    fetchExaminations();
-                } else {
-                    alert('Failed to delete examination: ' + (data.error || 'Unknown error'));
-                }
-            })
-            .catch(() => {
-                document.getElementById('deleteExamModal').style.display = 'none';
-                alert('Failed to delete examination due to network error.');
-            });
-    };
+
     // If on exams.html, autofill exam name from query param and make readonly
     if (window.location.pathname.endsWith('/exams/')) {
         const urlParams = new URLSearchParams(window.location.search);
@@ -1947,23 +1612,28 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (!tbody || !form) return;
                 const confirmBtn = document.getElementById('confirmScheduleBtn');
                 if (data.groups && data.groups.length) {
+                    const isLocked = form.dataset.locked === 'true';
                     tbody.innerHTML = data.groups.map(group => {
-                        const disabled = group.clash ? 'disabled' : '';
+                        const disabledAttr = (group.clash || isLocked) ? 'disabled' : '';
                         const clashStyle = group.clash ? 'background:#ffe6e6;color:#b30000;' : '';
                         const clashMsg = group.clash ? '<div style="color:#b30000;font-size:0.9em;">Clash: Student has another exam in this slot</div>' : '';
                         const studentIds = group.student_ids ? group.student_ids.join(',') : '';
+                        const isChecked = group.is_already_scheduled ? 'checked' : '';
+                        const rowStyle = group.is_already_scheduled ? 'background: #e6f9e6;' : '';
+                        const assignedLabel = group.is_already_scheduled ? ' <span style="color:#1a7f1a; font-weight:600; font-size:0.85em;">(Already Assigned)</span>' : '';
+                        
                         return `
-                    <tr style="${clashStyle}">
-                        <td><input type="checkbox" name="selected_groups" value="${group.course_code}|${group.regulation}|${group.academic_year}|${group.semester}" ${disabled} ${group.clash ? 'tabindex="-1" aria-disabled="true"' : ''}></td>
-                        <td>${group.course_code}</td>
-                        <td>${group.course_name}</td>
-                        <td>${group.registration_type}</td>
-                        <td>${group.regulation}</td>
-                        <td>${group.academic_year}</td>
-                        <td>${group.semester}</td>
-                        <td data-students="${studentIds}">${group.student_count}${clashMsg}</td>
-                    </tr>
-                    `;
+                        <tr style="${clashStyle}${rowStyle}">
+                            <td><input type="checkbox" name="selected_groups" value="${group.course_code}|${group.regulation}|${group.academic_year}|${group.semester}" ${isChecked} ${disabledAttr} ${group.clash ? 'tabindex="-1" aria-disabled="true"' : ''}></td>
+                            <td>${group.course_code}</td>
+                            <td>${group.course_name}${assignedLabel}</td>
+                            <td>${group.registration_type}</td>
+                            <td>${group.regulation}</td>
+                            <td>${group.academic_year}</td>
+                            <td>${group.semester}</td>
+                            <td data-students="${studentIds}">${group.student_count}${clashMsg}</td>
+                        </tr>
+                        `;
                     }).join('');
                     form.style.display = '';
                     if (confirmBtn) confirmBtn.style.display = '';
@@ -3036,46 +2706,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 
-// Add event handler for edit-exam-btn
-$(document).on('click', '.edit-exam-btn', function (e) {
-    e.preventDefault();
-    var row = $(this).closest('tr');
-    var examId = $(this).data('exam-id');
-    var examName = row.find('td').eq(1).text().trim();
-    var academicYear = row.find('td').eq(2).text().trim();
-    var semester = row.find('td').eq(3).text().trim();
-    var startDateRaw = row.find('td[data-raw]').eq(0).data('raw') || '';
-    var endDateRaw = row.find('td[data-raw]').eq(1).data('raw') || '';
-
-    // Fill modal fields
-    $('#editExamId').val(examId);
-    $('#edit_examname').val(examName);
-    $('#edit_academic_year').val(academicYear);
-    $('#edit_semester').val(semester);
-    $('#edit_start_date').val(startDateRaw.match(/^\d{4}-\d{2}-\d{2}$/) ? startDateRaw : '');
-    $('#edit_end_date').val(endDateRaw.match(/^\d{4}-\d{2}-\d{2}$/) ? endDateRaw : '');
-    // Set date constraints
-    var todayStr = (function () {
-        var d = new Date();
-        var m = (d.getMonth() + 1).toString().padStart(2, '0');
-        var day = d.getDate().toString().padStart(2, '0');
-        return d.getFullYear() + '-' + m + '-' + day;
-    })();
-    var editStartDateElem = document.getElementById('edit_start_date');
-    var editEndDateElem = document.getElementById('edit_end_date');
-    if (editStartDateElem) editStartDateElem.min = todayStr;
-    if (editEndDateElem && editStartDateElem) editEndDateElem.min = editStartDateElem.value;
-    // Remove previous event listeners to avoid stacking
-    if (editStartDateElem && editEndDateElem) {
-        editStartDateElem.onchange = function () {
-            editEndDateElem.min = editStartDateElem.value;
-            if (editEndDateElem.value && editEndDateElem.value < editStartDateElem.value) {
-                editEndDateElem.value = '';
-            }
-        };
-    }
-    $('#editExamModal').css('display', 'flex');
-});
+// Rogue jQuery edit-exam-btn handler purged to favor global Vanilla JS listener
 
 // ========== Data Export Manager (Student, Faculty, Room, Course) ==========
 const ExportManager = {
@@ -3539,8 +3170,180 @@ const SpecialDownloadManager = {
     }
 };
 
+// ==========================================================================
+// Exam Lock & Publish Workflow Handlers
+// ==========================================================================
+function initExamWorkflowHandlers() {
+    document.addEventListener('click', function (e) {
+        // 1. Lock Toggle Handler (Updated for Confirmation Modal)
+        const lockBtn = e.target.closest('.lock-toggle-btn');
+        if (lockBtn) {
+            e.preventDefault();
+            const examId = lockBtn.dataset.examId;
+            const isLocked = lockBtn.dataset.isLocked === 'true'; // Current state
+            
+            document.getElementById('lockModalExamId').value = examId;
+            document.getElementById('lockModalIsLocked').value = isLocked;
+            
+            const title = isLocked ? 'Unlock Examination' : 'Lock Examination';
+            const text = isLocked 
+                ? 'Are you sure you want to <strong>Unlock</strong> this examination? This will allow modifications to scheduling and allocations. Please enter your password to confirm.' 
+                : 'Are you sure you want to <strong>Lock</strong> this examination? This will freeze all data and prevent any further modifications.';
+            const icon = isLocked ? '🔓' : '🔒';
+            const btnText = isLocked ? 'Confirm Unlock' : 'Confirm Lock';
+            
+            document.getElementById('lockModalTitle').textContent = title;
+            document.getElementById('lockModalText').innerHTML = text;
+            document.getElementById('lockModalIcon').textContent = icon;
+            document.getElementById('confirmLockBtn').textContent = btnText;
+            
+            // Show password field only for unlocking
+            document.getElementById('passwordFieldContainer').style.display = isLocked ? 'block' : 'none';
+            document.getElementById('lockAdminPassword').value = ''; // Reset password
+            
+            toggleGlobalModal('lockConfirmModal', true);
+            return;
+        }
+
+        // 2. Publish Trigger
+        const pubTrigger = e.target.closest('.publish-exam-btn-trigger');
+        if (pubTrigger) {
+            e.preventDefault();
+            if (pubTrigger.dataset.locked === 'true') {
+                showLockAlert('Publishing is disabled for locked examinations.', 'Admin');
+                return;
+            }
+            document.getElementById('publishExamId').value = pubTrigger.dataset.examId;
+            document.getElementById('publishActionType').value = 'PUBLISH';
+            document.getElementById('publishModalTitle').textContent = 'Confirm Publication';
+            document.getElementById('publishModalText').innerHTML = 'Are you sure you want to <strong>Publish</strong> this examination? The schedule will become visible to all students.';
+            document.getElementById('publishModalIcon').textContent = '📢';
+            toggleGlobalModal('publishConfirmModal', true);
+            return;
+        }
+
+        // 3. Unpublish Trigger
+        const unpubTrigger = e.target.closest('.unpublish-exam-btn');
+        if (unpubTrigger) {
+            e.preventDefault();
+            if (unpubTrigger.dataset.locked === 'true') {
+                showLockAlert('Unpublishing is disabled for locked examinations.', 'Admin');
+                return;
+            }
+            document.getElementById('publishExamId').value = unpubTrigger.dataset.examId;
+            document.getElementById('publishActionType').value = 'UNPUBLISH';
+            document.getElementById('publishModalTitle').textContent = 'Unpublish Examination';
+            document.getElementById('publishModalText').innerHTML = 'Are you sure you want to <strong>Unpublish</strong> this examination? It will no longer be visible to students.';
+            document.getElementById('publishModalIcon').textContent = '🛑';
+            toggleGlobalModal('publishConfirmModal', true);
+            return;
+        }
+
+        // 4. Edit/Delete Lock Override
+        const editTrigger = e.target.closest('.edit-exam-link-trigger');
+        const deleteTrigger = e.target.closest('.delete-exam-link-trigger');
+        if ((editTrigger || deleteTrigger) && (editTrigger?.dataset.locked === 'true' || deleteTrigger?.dataset.locked === 'true')) {
+            e.preventDefault();
+            e.stopPropagation();
+            showLockAlert('This examination is locked. No edits or deletions are permitted.', 'Admin');
+            return;
+        }
+    }, true);
+
+    const confirmPublishBtn = document.getElementById('confirmPublishBtn');
+    if (confirmPublishBtn) {
+        confirmPublishBtn.addEventListener('click', function() {
+            const examId = document.getElementById('publishExamId').value;
+            const actionType = document.getElementById('publishActionType').value;
+            const endpoint = actionType === 'PUBLISH' ? '/ops/ajax/publish_exam/' : '/ops/ajax/unpublish_exam/';
+            
+            this.textContent = 'Processing...';
+            this.disabled = true;
+
+            fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || ''
+                },
+                body: JSON.stringify({ exam_id: examId })
+            })
+            .then(resp => resp.json())
+            .then(data => {
+                if (data.success) {
+                    showPopupMessage(`Exam ${actionType === 'PUBLISH' ? 'published' : 'unpublished'} successfully.`, 'success');
+                    toggleGlobalModal('publishConfirmModal', false);
+                    fetchExaminations();
+                } else {
+                    showPopupMessage(data.error || 'Action failed.', 'error');
+                }
+            })
+            .finally(() => {
+                this.textContent = 'Confirm';
+                this.disabled = false;
+            });
+        });
+    }
+
+    // Lock/Unlock Confirmation Handler
+    const confirmLockBtn = document.getElementById('confirmLockBtn');
+    if (confirmLockBtn) {
+        confirmLockBtn.addEventListener('click', function() {
+            const examId = document.getElementById('lockModalExamId').value;
+            const isLocked = document.getElementById('lockModalIsLocked').value === 'true';
+            const password = document.getElementById('lockAdminPassword').value;
+            const endpoint = isLocked ? '/ops/ajax/unlock_exam/' : '/ops/ajax/lock_exam/';
+            
+            if (isLocked && !password) {
+                showPopupMessage('Password is required to unlock.', 'error');
+                return;
+            }
+
+            this.textContent = 'Processing...';
+            this.disabled = true;
+
+            const payload = { exam_id: examId };
+            if (isLocked) payload.password = password;
+
+            fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || ''
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(resp => resp.json())
+            .then(data => {
+                this.textContent = 'Confirm Action';
+                this.disabled = false;
+                if (data.success) {
+                    toggleGlobalModal('lockConfirmModal', false);
+                    showPopupMessage(`Examination ${isLocked ? 'Unlocked' : 'Locked'} successfully.`, 'success');
+                    fetchExaminations();
+                } else {
+                    showPopupMessage(data.error || 'Action failed.', 'error');
+                }
+            })
+            .catch(() => {
+                this.textContent = 'Confirm Action';
+                this.disabled = false;
+                showPopupMessage('Network error.', 'error');
+            });
+        });
+    }
+
+    function showLockAlert(reason, adminName) {
+        document.getElementById('lockAlertText').textContent = reason;
+        const auditInfo = document.getElementById('lockAuditInfo');
+        if (auditInfo) auditInfo.textContent = `Locked by administrative authority. Please contact DB Admin for assistance.`;
+        toggleGlobalModal('lockAlertModal', true);
+    }
+}
+
 // Initialize Managers
 document.addEventListener('DOMContentLoaded', () => {
     ExportManager.init();
     SpecialDownloadManager.init();
+    initExamWorkflowHandlers();
 });

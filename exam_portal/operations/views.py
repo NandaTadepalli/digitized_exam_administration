@@ -3,6 +3,8 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.http import JsonResponse
+from django.urls import reverse
+from urllib.parse import urlencode
 
 def ajax_seating_plan(request):
     slot_id = request.GET.get('slot_id')
@@ -294,6 +296,12 @@ def ajax_generate_seating_plan(request):
         # If not all assigned, proceed to generate seating plan
     # If not generated, proceed
     result = generate_seating_plan(slot_id)
+    if result.get('status') == 'success':
+        from .models import SlotWorkflow
+        workflow, _ = SlotWorkflow.objects.get_or_create(exam_slot=slot)
+        workflow.seating_step = True
+        workflow.updated_by = request.user
+        workflow.save()
     return JsonResponse(result)
 from django.shortcuts import render
 from .models import ExamSlot, Exam, StudentCourse
@@ -302,7 +310,20 @@ from django.contrib import messages
 
 def exam_rooms_alloc(request):
     slot_id = request.GET.get('slot_id') or request.POST.get('slot_id')
-    slot = None
+    if not slot_id:
+        return redirect('operations:exams')
+    
+    from .models import ExamSlot, RoomAllocation
+    slot = ExamSlot.objects.filter(id=slot_id).select_related('examination').first()
+    if not slot:
+        return redirect('operations:exams')
+    
+    is_locked = slot.examination and slot.examination.is_locked
+    if request.method == "POST" and is_locked:
+        from django.contrib import messages
+        messages.error(request, "This examination is locked. Changes are not permitted.")
+        return redirect(request.path + f"?slot_id={slot_id}")
+
     student_count = 0
     overlapping_room_ids = []
     rooms = Room.objects.filter(is_active=True).exclude(id__in=overlapping_room_ids)
@@ -356,18 +377,21 @@ def exam_rooms_alloc(request):
                 msg = "Room allocations saved."
                 if added_rooms:
                     msg += f"<br>Added rooms: {', '.join(added_rooms)}"
-                from django.shortcuts import redirect
-                from django.urls import reverse
-                request.session['room_alloc_success'] = msg
-                if deleted_rooms:
-                    request.session['room_alloc_warning'] = f"Deleted rooms: {', '.join(deleted_rooms)}"
-                exam_obj = None
-                exam_slot_obj = None
-                params = {}
-                from urllib.parse import urlencode
                 url = reverse('operations:exams')
-                if params:
-                    url += '?' + urlencode(params)
+                params = {
+                    'exam_id': slot.examination.id if slot.examination else '',
+                    'exam_name': slot.examination.exam_name if slot.examination else '',
+                    'start_date': slot.examination.start_date.strftime('%Y-%m-%d') if slot.examination else '',
+                    'end_date': slot.examination.end_date.strftime('%Y-%m-%d') if slot.examination else '',
+                    'registration_type': slot.registration_type
+                }
+                url += '?' + urlencode(params)
+                
+                from .models import SlotWorkflow
+                workflow, _ = SlotWorkflow.objects.get_or_create(exam_slot=slot)
+                workflow.rooms_step = True
+                workflow.reset_downstream('rooms', request.user)
+                
                 return redirect(url)
             if request.method == "GET":
                 from .models import RoomAllocation
@@ -400,6 +424,7 @@ def exam_rooms_alloc(request):
                 allocated_room_capacity = sum([get_safe_capacity(r) for r in allocated_rooms])
         except ExamSlot.DoesNotExist:
             slot = None
+    is_locked = slot.examination and slot.examination.is_locked
     return render(request, "operations/exam_rooms_alloc.html", {
         'slot': slot,
         'rooms': rooms,
@@ -409,15 +434,26 @@ def exam_rooms_alloc(request):
         'required_capacity': required_capacity,
         'allocated_room_count': allocated_room_count,
         'allocated_room_capacity': allocated_room_capacity,
+        'is_locked': is_locked,
     })
 
 def exam_faculty_alloc(request):
     slot_id = request.GET.get('slot_id') if request.method == 'GET' else request.POST.get('slot_id')
-    slot = None
-    faculties = []
-    total_students = 0
-    allocated_faculty = 0
+    if not slot_id:
+        return redirect('operations:exams')
+        
     from operations.models import FacultyAvailability, ExamSlot
+    slot = ExamSlot.objects.filter(id=slot_id).select_related('examination').first()
+    if not slot:
+        return redirect('operations:exams')
+        
+    is_locked = slot.examination and slot.examination.is_locked
+    if request.method == "POST" and is_locked:
+        from django.contrib import messages
+        messages.error(request, "This examination is locked. Changes are not permitted.")
+        return redirect(request.path + f"?slot_id={slot_id}")
+
+    faculties = []
     if not slot_id:
         debug_message = "Slot ID is missing. Please select a slot before assigning faculty."
         from .models import ExamSlot
@@ -482,9 +518,21 @@ def exam_faculty_alloc(request):
                 messages.success(request, "Faculty allocation updated. " + ' | '.join(msg_parts))
             else:
                 messages.info(request, "No changes made to faculty allocation.")
+            from .models import SlotWorkflow
+            workflow, _ = SlotWorkflow.objects.get_or_create(exam_slot=slot)
+            workflow.faculty_step = True
+            workflow.reset_downstream('faculty', request.user)
+            
             # Redirect to avoid repeated processing/messages
-            from django.shortcuts import redirect
-            return redirect(f'/ops/exam_faculty_alloc/?slot_id={slot.id}')
+            params = {
+                'exam_id': slot.examination.id if slot.examination else '',
+                'exam_name': slot.examination.exam_name if slot.examination else '',
+                'start_date': slot.examination.start_date.strftime('%Y-%m-%d') if slot.examination else '',
+                'end_date': slot.examination.end_date.strftime('%Y-%m-%d') if slot.examination else '',
+                'registration_type': slot.registration_type
+            }
+            url = reverse('operations:exams') + '?' + urlencode(params)
+            return redirect(url)
         # Always show currently allocated faculty for this slot
         allocated_faculty_objs = Faculty.objects.filter(facultyavailability__exam_slot=slot)
         from operations.models import Exam
@@ -560,7 +608,8 @@ def exam_faculty_alloc(request):
         'success_message': success_message,
         'allocated_faculty_objs': allocated_faculty_objs,
         'allocated_faculty_ids': allocated_faculty_ids,
-        'faculty_shortage_warning': faculty_shortage_warning
+        'faculty_shortage_warning': faculty_shortage_warning,
+        'is_locked': is_locked,
     })
 from django.http import JsonResponse
 from django.core.paginator import Paginator
@@ -618,6 +667,9 @@ def ajax_examinations(request):
             'start_date': exam.start_date.strftime('%Y-%m-%d'),
             'end_date': exam.end_date.strftime('%Y-%m-%d'),
             'published': exam.published,
+            'is_locked': exam.is_locked,
+            'locked_by_name': exam.locked_by.username if exam.locked_by else None,
+            'lock_updated_at': exam.lock_updated_at.strftime('%Y-%m-%d %H:%M') if exam.lock_updated_at else None,
         })
     return JsonResponse({
         'results': results,
@@ -873,6 +925,11 @@ def exams(request):
                     registration_type=reg_type
                 )
                 slot.save()
+                
+                # Create Workflow record
+                from .models import SlotWorkflow
+                SlotWorkflow.objects.create(exam_slot=slot, updated_by=request.user)
+                
                 messages.success(request, "Exam slot created successfully.")
                 from django.shortcuts import redirect
                 from django.urls import reverse
@@ -945,7 +1002,14 @@ def report(request):
 def exam_scheduling(request, slot_id):
     from operations.models import StudentCourse, Exam
     from masters.models import Course
-    slot = ExamSlot.objects.get(id=slot_id)
+    slot = ExamSlot.objects.select_related('examination').get(id=slot_id)
+    
+    is_locked = slot.examination and slot.examination.is_locked
+    if request.method == "POST" and is_locked:
+        from django.contrib import messages
+        messages.error(request, "This examination is locked. Changes are not permitted.")
+        return redirect('operations:schedule_exam', slot_id=slot_id)
+
     # Handle POST for scheduling selected groups
     if request.method == "POST":
         selected = request.POST.getlist('selected_groups')
@@ -972,17 +1036,45 @@ def exam_scheduling(request, slot_id):
                     (filter_regulation and regulation != filter_regulation):
                     logging.info("Group skipped due to filter mismatch.")
                     continue
+            except Exception as e:
+                logging.error(f"Error parsing group {group}: {e}")
+                continue
+
+        # Transition to Sync Logic: Add new, remove unselected
+        from operations.models import Exam, StudentExamMap
+        current_exams = Exam.objects.filter(exam_slot=slot)
+        
+        # Parse selected keys
+        selected_keys = set()
+        for group in selected:
+            parts = group.split('|')
+            if len(parts) >= 2:
+                selected_keys.add((parts[0], parts[1])) # course_code, regulation
+        
+        # Identify exams to remove
+        for ex in current_exams:
+            if (ex.course.course_code, ex.regulation) not in selected_keys:
+                ex.delete()
+                created += 1 # Count as a change
+        
+        # Process arrivals
+        for group in selected:
+            try:
+                parts = group.split('|')
+                if len(parts) < 4: continue
+                course_code, regulation, ay, sem = parts[0], parts[1], parts[2], parts[3]
+                
                 course = Course.objects.get(course_code=course_code)
-                # Check if Exam for this group and slot already exists
-                from operations.models import Exam
+                
+                # Check if Exam already exists
                 existing_exam = Exam.objects.filter(
                     exam_slot=slot,
                     course=course,
                     regulation=regulation
                 ).first()
                 if existing_exam:
-                    logging.info(f"Exam already exists for group {group} in slot {slot_id}, skipping.")
                     continue
+                
                 # Create new Exam
                 exam = Exam.objects.create(
                     exam_slot=slot,
@@ -991,14 +1083,12 @@ def exam_scheduling(request, slot_id):
                 )
                 students = StudentCourse.objects.filter(
                     course=course,
-                    academic_year=filter_academic_year,
-                    semester=filter_semester,
+                    academic_year=ay,
+                    semester=sem,
                     student__batch__batch_code=regulation,
                     registration_type=slot.registration_type
                 ).select_related('student')
-                logging.info(f"StudentCourse Query: course={course_code}, academic_year={filter_academic_year}, semester={filter_semester}, batch_code={regulation}, registration_type={slot.registration_type}")
-                logging.info(f"Scheduling group {group}: Found {students.count()} students.")
-                logging.info(f"Student IDs: {[reg.student.id for reg in students]}")
+                
                 for reg in students:
                     StudentExamMap.objects.create(
                         exam=exam,
@@ -1017,11 +1107,22 @@ def exam_scheduling(request, slot_id):
                 groups_str = ", ".join(groups)
                 messages.error(request, f"Error for groups [{groups_str}]: {msg}")
 
-        from django.shortcuts import redirect
         if created:
+            from .models import SlotWorkflow
+            workflow, _ = SlotWorkflow.objects.get_or_create(exam_slot=slot)
+            workflow.courses_step = True
+            workflow.reset_downstream('courses', request.user)
+            
             messages.success(request, f"Scheduled {created} exam(s) successfully.")
-            from django.urls import reverse
-            return redirect(reverse('operations:schedule_exam', kwargs={'slot_id': slot_id}))
+            params = {
+                'exam_id': slot.examination.id if slot.examination else '',
+                'exam_name': slot.examination.exam_name if slot.examination else '',
+                'start_date': slot.examination.start_date.strftime('%Y-%m-%d') if slot.examination else '',
+                'end_date': slot.examination.end_date.strftime('%Y-%m-%d') if slot.examination else '',
+                'registration_type': slot.registration_type
+            }
+            url = reverse('operations:exams') + '?' + urlencode(params)
+            return redirect(url)
         elif not error_groups:
             messages.error(request, "No exams were scheduled. Please try again.")
     # Only fetch filter values for dropdowns
@@ -1036,6 +1137,7 @@ def exam_scheduling(request, slot_id):
         'academic_years': academic_years,
         'semesters': semesters,
         'regulations': regulations,
+        'is_locked': is_locked,
     })
 
 def report_timetable(request):

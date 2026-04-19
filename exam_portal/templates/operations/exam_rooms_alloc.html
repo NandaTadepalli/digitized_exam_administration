@@ -44,7 +44,8 @@
                         <tr>
                             <td>
                                 <input type="checkbox" name="selected_rooms" value="{{ room.id }}" data-capacity="{{ room.capacity }}" 
-                                    {% if room.id in allocated_room_ids %}checked{% endif %}>
+                                    {% if room.id in allocated_room_ids %}checked{% endif %}
+                                    {% if is_locked %}disabled{% endif %}>
                             </td>
                             <td>{{ room.room_code }}</td>
                             <td>{{ room.room_type }}</td>
@@ -59,9 +60,15 @@
 					</tbody>
 				</table>
 			</div>
-			<button type="submit" class="control-btn">Allocate Selected Rooms</button>
-			<button type="button" class="control-btn ml-10" id="clear-room-selection">Clear
-				All</button>
+            {% if is_locked %}
+                <div class="locked-banner-inline mt-20" style="background:#fef2f2;color:#b91c1c;padding:12px;border-radius:10px;border:1px solid #fee2e2;font-weight:600;display:flex;align-items:center;">
+                    <img src="https://img.icons8.com/?size=100&id=DZbPJ4lsqOdQ&format=png&color=b91c1c" style="width:20px;height:20px;margin-right:10px;">
+                    This examination is Locked. Room allocations are Read-Only.
+                </div>
+            {% else %}
+			    <button type="submit" class="control-btn">Allocate Selected Rooms</button>
+			    <button type="button" class="control-btn ml-10" id="clear-room-selection">Clear All</button>
+            {% endif %}
 		</form>
 	</div>
 	{% endblock %}

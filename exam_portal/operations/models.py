@@ -1,4 +1,5 @@
 from django.db import models, transaction
+from django.conf import settings
 from masters.models import Student, Faculty, Course, Room
 
 class Examinations(models.Model):
@@ -8,6 +9,9 @@ class Examinations(models.Model):
     academic_year = models.CharField(max_length=20, null=True)
     semester = models.CharField(max_length=20,null=True)
     published = models.BooleanField(default=False)
+    is_locked = models.BooleanField(default=False)
+    locked_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='locked_exams')
+    lock_updated_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "examinations"
@@ -238,3 +242,33 @@ class Attendance(models.Model):
 
     def __str__(self):
         return f"Attendance Record {self.id}"
+from django.conf import settings
+
+class SlotWorkflow(models.Model):
+    exam_slot = models.OneToOneField(ExamSlot, on_delete=models.CASCADE, related_name='workflow')
+    courses_step = models.BooleanField(default=False)
+    rooms_step = models.BooleanField(default=False)
+    faculty_step = models.BooleanField(default=False)
+    seating_step = models.BooleanField(default=False)
+    
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+
+    class Meta:
+        db_table = "slot_workflow"
+
+    def reset_downstream(self, step, user=None):
+        """Resets all steps after the modified step and updates the user."""
+        if user:
+            self.updated_by = user
+            
+        if step == "courses":
+            self.rooms_step = False
+            self.faculty_step = False
+            self.seating_step = False
+        elif step == "rooms":
+            self.faculty_step = False
+            self.seating_step = False
+        elif step == "faculty":
+            self.seating_step = False
+        self.save()

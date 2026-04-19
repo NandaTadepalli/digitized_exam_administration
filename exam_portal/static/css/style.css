@@ -185,9 +185,12 @@
 }
 
 .dashboard-popup-table th {
-  background: #f1f5f9;
-  color: #1E3A5F;
+  background: #1E3A5F;
+  color: #ffffff;
   font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
 }
 
 .dashboard-popup-table tr:nth-child(even) {
@@ -467,11 +470,18 @@
 }
 
 /* Popup Message Styles */
+.popup-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+}
+
 #popup-messages {
   position: fixed;
   top: 32px;
   right: 32px;
-  z-index: 2000;
+  z-index: 10000;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -3797,7 +3807,7 @@ body.modal-open {
     background: rgba(15, 23, 42, 0.45); /* Sophisticated Slate Overlay */
     backdrop-filter: blur(14px) saturate(200%); /* Premium Glassmorphism */
     -webkit-backdrop-filter: blur(14px) saturate(200%);
-    z-index: 10000;
+    z-index: 1000000 !important;
     align-items: center;
     justify-content: center;
     padding: 20px;
@@ -3830,44 +3840,45 @@ body.modal-open {
 .global-modal-content.wide { width: 1150px; }
 
 .modal-header-std {
-    padding: 24px 32px;
-    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-    border-bottom: 1px solid #e2e8f0;
+    padding: 20px 32px;
+    background: linear-gradient(135deg, #1e3a5f 0%, #3c5f88 100%);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
     display: flex;
     justify-content: space-between;
     align-items: center;
+    color: #ffffff;
 }
 
 .modal-header-std h2, .modal-header-std h5 {
     margin: 0;
-    font-size: 1.4rem;
-    font-weight: 800;
-    color: #0f172a;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #ffffff;
     display: flex;
     align-items: center;
-    gap: 14px;
-    letter-spacing: -0.025em;
+    gap: 12px;
+    letter-spacing: -0.01em;
 }
 
 .close-global-modal {
-    background: #f1f5f9;
+    background: rgba(255, 255, 255, 0.15);
     border: none;
-    width: 40px;
-    height: 40px;
-    border-radius: 14px;
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    font-size: 1.5rem;
-    color: #64748b;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 1.4rem;
+    color: #ffffff;
+    transition: all 0.25s ease;
 }
 
 .close-global-modal:hover {
-    background: #fee2e2;
-    color: #ef4444;
-    transform: rotate(90deg) scale(1.1);
+    background: #ef4444;
+    color: #ffffff;
+    transform: rotate(90deg);
 }
 
 .modal-body-std {
@@ -4013,4 +4024,146 @@ body.modal-open {
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+/* ==========================================================================
+   Premium Aurora Form v3.5 - Global Modular System
+   ========================================================================== */
+.form-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 25px;
+    margin-top: 15px;
+}
+
+@media (max-width: 650px) {
+    .form-grid-2 { grid-template-columns: 1fr; gap: 15px; }
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 5px;
+}
+
+.form-label {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #334155;
+    letter-spacing: 0.025em;
+    text-transform: uppercase;
+    margin-left: 2px;
+}
+
+.form-control {
+    width: 100%;
+    padding: 14px 18px;
+    border: 1.8px solid #e2e8f0;
+    border-radius: 14px;
+    font-size: 1rem;
+    color: #0f172a;
+    background: #ffffff;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-sizing: border-box;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #2563eb;
+    background: #ffffff;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12), 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    transform: translateY(-1px);
+}
+
+.form-control::placeholder {
+    color: #94a3b8;
+    font-weight: 400;
+}
+
+.form-control:hover:not(:focus) {
+    border-color: #cbd5e1;
+    background: #fbfcfe;
+}
+
+.form-control:disabled {
+    background: #f1f5f9;
+    cursor: not-allowed;
+    color: #64748b;
+    border-color: #e2e8f0;
+}
+
+/* Modal sizing & enhancements */
+.global-modal-content.medium { width: 750px; }
+.global-modal-content.narrow { width: 450px; }
+.global-modal-content.wide { width: 1150px; }
+
+.modal-body-std {
+    padding: 32px;
+    background: #ffffff;
+    overflow-y: auto;
+}
+
+.modal-footer-std {
+    padding: 20px 32px;
+    background: #f8fafc;
+    border-top: 1.5px solid #f1f5f9;
+    display: flex;
+    justify-content: flex-end;
+    gap: 16px;
+    border-radius: 0 0 28px 28px;
+}
+
+.exam-row-locked {
+    background-color: #f8fafc !important;
+}
+
+.exam-row-locked td {
+    color: #94a3b8;
+}
+
+.disabled-action {
+    opacity: 0.3;
+    pointer-events: auto; /* Keep events to show the alert modal */
+    cursor: not-allowed;
+    filter: grayscale(100%);
+}
+
+.lock-toggle-btn {
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    display: inline-block;
+}
+
+.lock-toggle-btn:hover {
+    transform: scale(1.2);
+}
+
+.exam-status-publish-ready {
+    animation: pulse-amber 2s infinite;
+}
+
+@keyframes pulse-amber {
+    0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+
+.publish-exam-btn-trigger:hover .exam-status {
+    background: #fffbe6 !important;
+    border-color: #f59e0b !important;
+    transform: translateY(-1px);
+}
+
+.slot-link-locked {
+    color: #ef4444 !important; /* Soft Red */
+    background: #fef2f2 !important;
+    border: 1px solid #fee2e2;
+    padding: 2px 8px;
+    border-radius: 6px;
+    text-decoration: none !important;
+}
+
+.slot-link-locked:hover {
+    background: #fee2e2 !important;
 }

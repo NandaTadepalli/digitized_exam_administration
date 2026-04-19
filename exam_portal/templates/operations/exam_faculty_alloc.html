@@ -2,31 +2,14 @@
 {% load static %}
 {% block content %}
 <div class="pages-main">
-    {% if messages %}
-    {% for message in messages %}
-    {% if message.tags != 'info' or message != 'No changes made to faculty allocation.' %}
-    <div class="msg-green">{{ message }}</div>
-    {% endif %}
-    {% endfor %}
-    {% endif %}
-
-    {% if allocated_faculty_objs %}
-    <div class="mb-10">
-        <strong>Currently Allocated Faculty for this Slot:</strong>
-        <ul>
-            {% for fac in allocated_faculty_objs %}
-            <li>{{ fac.faculty_name }} ({{ fac.faculty_id }}){% if fac.dept %} - {{ fac.dept.dept_name }}{% endif %}</li>
-            {% endfor %}
-        </ul>
-    </div>
-    {% endif %}
 
     <h1 class="pages-main-head">Faculty Assignment Details</h1>
     <div class="note-text">
         <p class="note-navy">Faculty assignment details for selected exam slot.</p>
     </div>
     <div class="controls-1 controls-flex-wrap">
-        <div class="readonly-field min-w-220"><label>Exam Name:</label> <span>{{ slot.examination.exam_name }}</span></div>
+        <div class="readonly-field min-w-220"><label>Exam Name:</label> <span>{{ slot.examination.exam_name }}</span>
+        </div>
         <div class="readonly-field min-w-220"><label>Exam Type:</label> <span>{{ slot.exam_type }}</span></div>
         <div class="readonly-field min-w-220"><label>Mode:</label> <span>{{ slot.mode }}</span></div>
         <div class="readonly-field min-w-220"><label>Exam Date:</label> <span>{{ slot.exam_date }}</span></div>
@@ -68,7 +51,8 @@
                         <tr>
                             <td>
                                 <input type="checkbox" name="selected_faculty" value="{{ faculty.id }}" 
-                                    {% if faculty.id in allocated_faculty_ids %}checked{% endif %}>
+                                    {% if faculty.id in allocated_faculty_ids %}checked{% endif %}
+                                    {% if is_locked %}disabled{% endif %}>
                             </td>
                             <td>{{ faculty.id }}</td>
                             <td>{{ faculty.name }}</td>
@@ -84,9 +68,15 @@
                 </table>
             </div>
             <div class="mt-10">
-                <button type="submit" class="control-btn" name="assign_faculty">Assign Selected Faculty</button>
-                <button type="button" class="control-btn ml-10" id="clear-faculty-selection">Clear
-                    All</button>
+                {% if is_locked %}
+                    <div class="locked-banner-inline mt-10" style="background:#fef2f2;color:#b91c1c;padding:12px;border-radius:10px;border:1px solid #fee2e2;font-weight:600;display:flex;align-items:center;">
+                        <img src="https://img.icons8.com/?size=100&id=DZbPJ4lsqOdQ&format=png&color=b91c1c" style="width:20px;height:20px;margin-right:10px;">
+                        This examination is Locked. Faculty assignments are Read-Only.
+                    </div>
+                {% else %}
+                    <button type="submit" class="control-btn" name="assign_faculty">Assign Selected Faculty</button>
+                    <button type="button" class="control-btn ml-10" id="clear-faculty-selection">Clear All</button>
+                {% endif %}
             </div>
         </form>
     </div>

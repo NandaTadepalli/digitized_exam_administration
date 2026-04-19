@@ -1,98 +1,6 @@
 {% extends "core/base_admin.html" %}
 {% load static %}
 {% block content %}
-<!-- Edit Examination Modal -->
-<div id="editExamModal" class="global-modal-backdrop">
-    <div class="global-modal-content">
-        <div class="modal-header-std">
-            <h2>
-                <img src="https://img.icons8.com/ios-filled/24/1e293b/edit.png" alt="edit">
-                Edit Examination
-            </h2>
-            <button type="button" class="close-global-modal" id="closeEditExamModal">&times;</button>
-        </div>
-        <div class="modal-body-std">
-            <form id="editExamForm" class="management-form" style="display: block;">
-                {% csrf_token %}
-                <input type="hidden" id="editExamId" name="exam_id">
-                
-                <div style="margin-bottom: 15px;">
-                    <label for="edit_examname" style="display: block; margin-bottom: 5px; font-weight: 600;">Exam Name:</label>
-                    <input type="text" id="edit_examname" name="examname" class="form-control" required style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px;">
-                </div>
-
-                <div style="display: flex; gap: 15px; margin-bottom: 15px;">
-                    <div style="flex: 1;">
-                        <label for="edit_academic_year" style="display: block; margin-bottom: 5px; font-weight: 600;">Academic Year:</label>
-                        <select id="edit_academic_year" name="academic_year" class="form-control" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px;">
-                            <option value="">Select Year</option>
-                            {% for year in acd_years %}
-                            <option value="{{ year }}">{{ year }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div style="flex: 1;">
-                        <label for="edit_semester" style="display: block; margin-bottom: 5px; font-weight: 600;">Semester:</label>
-                        <select id="edit_semester" name="semester" class="form-control" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px;">
-                            <option value="">Select Semester</option>
-                            {% for sem in semesters %}
-                            <option value="{{ sem }}">{{ sem }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-
-                <div style="display: flex; gap: 15px; margin-bottom: 20px;">
-                    <div style="flex: 1;">
-                        <label for="edit_start_date" style="display: block; margin-bottom: 5px; font-weight: 600;">Start Date:</label>
-                        <input type="date" id="edit_start_date" name="start_date" class="form-control" required style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px;">
-                    </div>
-                    <div style="flex: 1;">
-                        <label for="edit_end_date" style="display: block; margin-bottom: 5px; font-weight: 600;">End Date:</label>
-                        <input type="date" id="edit_end_date" name="end_date" class="form-control" required style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px;">
-                    </div>
-                </div>
-            </form>
-        </div>
-        <div class="modal-footer-std">
-            <a href="#" id="cancelEditExamBtn" class="btn-cancel-export" style="text-decoration: none; padding: 10px 20px; border: 1px solid #cbd5e1; border-radius: 8px; color: #64748b;">Cancel</a>
-            <button type="submit" id="saveEditExamBtn" form="editExamForm" style="background: #2563eb; color: #fff; padding: 10px 25px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">Save Changes</button>
-        </div>
-    </div>
-</div>
-<script>
-    // Edit modal: enforce date rules as in creation form
-    document.addEventListener('DOMContentLoaded', function () {
-        var editStartInput = document.getElementById('edit_start_date');
-        var editEndInput = document.getElementById('edit_end_date');
-        // Set min for start date as today
-        var todayStr = (function () {
-            var d = new Date();
-            var m = (d.getMonth() + 1).toString().padStart(2, '0');
-            var day = d.getDate().toString().padStart(2, '0');
-            return d.getFullYear() + '-' + m + '-' + day;
-        })();
-        if (editStartInput) {
-            editStartInput.min = todayStr;
-        }
-        function updateEditEndMin() {
-            if (editStartInput && editEndInput) {
-                if (editStartInput.value) {
-                    editEndInput.min = editStartInput.value;
-                    if (editEndInput.value && editEndInput.value < editStartInput.value) {
-                        editEndInput.value = '';
-                    }
-                } else {
-                    editEndInput.min = todayStr;
-                }
-            }
-        }
-        if (editStartInput) {
-            editStartInput.addEventListener('change', updateEditEndMin);
-            updateEditEndMin();
-        }
-    });
-</script>
 <div class="pages-main">
     <h1 class="pages-main-head">Exam Management</h1>
     <div class="note-text">
@@ -172,14 +80,14 @@
             <thead>
                 <tr>
                     <th>#</th>
-                    <th>Exam</th>
+                    <th>Exam Name</th>
                     <th>Academic Year</th>
                     <th>Semester</th>
                     <th>Start Date</th>
                     <th>End Date</th>
                     <th>Slots</th>
                     <th>Status</th>
-                    <th>Action</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -192,7 +100,8 @@
         <a href="#" class="publish-exam-btn action-link publish-exam-btn-style" id="publishExamBtn">Publish
             Exam</a>
     </div>
-    <!-- Edit Examination Modal -->
+    
+    <!-- Edit Examination Modal (Premium Aurora v3.0) -->
     <div id="editExamModal" class="global-modal-backdrop">
         <div class="global-modal-content medium">
             <div class="modal-header-std">
@@ -205,11 +114,11 @@
             <form id="editExamForm" method="POST" action="{% url 'operations:ajax_edit_examination' %}">
                 {% csrf_token %}
                 <input type="hidden" id="editExamId" name="exam_id">
-                <div class="modal-body-std">
+                <div class="modal-body-std" style="padding: 25px;">
                     <div class="form-grid-2">
                         <div class="form-group">
                             <label for="edit_examname" class="form-label">Exam Name</label>
-                            <input type="text" id="edit_examname" name="examname" class="form-control" required>
+                            <input type="text" id="edit_examname" name="examname" class="form-control" placeholder="e.g. Final Sem Oct-2025" required>
                         </div>
                         <div class="form-group">
                             <label for="edit_academic_year" class="form-label">Academic Year</label>
@@ -238,8 +147,8 @@
                     </div>
                 </div>
                 <div class="modal-footer-std">
-                    <button type="button" class="btn-std btn-secondary close-modal">Cancel</button>
-                    <button type="submit" class="btn-std btn-primary">Save Changes</button>
+                    <button type="button" id="cancelEditExamBtn" class="btn-std btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-std btn-primary" style="padding-left: 30px; padding-right: 30px;">Save Changes</button>
                 </div>
             </form>
         </div>
@@ -255,22 +164,88 @@
                 </h2>
                 <button type="button" class="close-global-modal close-modal" id="closeDeleteExamModal">&times;</button>
             </div>
-            <div class="modal-body-std">
-                <div id="deleteExamWarning" class="warning-text-red" style="font-weight: 700; margin-bottom: 15px;"></div>
-                <div id="deleteExamDetails" style="margin-bottom: 20px; color: #475569; font-size: 0.95rem;"></div>
-                <p style="color: #64748b; font-size: 0.9rem;">This action cannot be undone. All data related to this examination will be permanently removed.</p>
+            <div class="modal-body-std" style="padding: 25px;">
+                <div id="deleteExamWarning" class="warning-text-red" style="font-weight: 700; margin-bottom: 15px; font-size: 1.1rem;"></div>
+                <div id="deleteExamDetails" style="margin-bottom: 20px; color: #475569; font-size: 0.95rem; line-height: 1.5;"></div>
+                <p style="color: #64748b; font-size: 0.9rem; background: #fff1f2; padding: 12px; border-radius: 8px; border-left: 4px solid #f43f5e;">
+                    <strong>Warning:</strong> This action cannot be undone. All data related to this examination will be permanently removed.
+                </p>
                 <form id="deleteExamForm">
                     {% csrf_token %}
                     <input type="hidden" id="deleteExamId" name="exam_id">
                 </form>
             </div>
             <div class="modal-footer-std">
-                <button type="button" id="cancelDeleteExamBtn" class="btn-std btn-secondary close-modal">Keep Exam</button>
+                <button type="button" id="cancelDeleteExamBtn" class="btn-std btn-secondary">Keep Exam</button>
                 <a href="#" id="confirmDeleteExamLink" class="btn-std btn-danger" style="text-decoration: none;">Delete Permanently</a>
             </div>
         </div>
     </div>
     <div id="examination-pagination" class="pagination"></div>
 </div>
+</div>
+
+<!-- Publish Confirmation Modal -->
+<div id="publishConfirmModal" class="global-modal-backdrop">
+    <div class="global-modal-content narrow">
+        <div class="modal-header-std">
+            <h2 id="publishModalTitle">Publish Examination</h2>
+            <button type="button" class="close-global-modal">&times;</button>
+        </div>
+        <div class="modal-body-std text-center">
+            <div id="publishModalIcon" style="font-size: 50px; margin-bottom: 20px;">📢</div>
+            <p id="publishModalText" style="font-size: 1.1rem; color: #334155; line-height: 1.5;">Are you sure you want to publish this examination? This will make the schedule visible to all students and faculty.</p>
+            <input type="hidden" id="publishExamId">
+            <input type="hidden" id="publishActionType">
+        </div>
+        <div class="modal-footer-std">
+            <button type="button" class="btn-std btn-secondary close-global-modal">Cancel</button>
+            <button type="button" class="btn-std btn-primary" id="confirmPublishBtn">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<!-- Lock/Unlock Confirmation Modal -->
+<div id="lockConfirmModal" class="global-modal-backdrop">
+    <div class="global-modal-content narrow">
+        <div class="modal-header-std">
+            <h2 id="lockModalTitle">Confirm Action</h2>
+            <button type="button" class="close-global-modal">&times;</button>
+        </div>
+        <div class="modal-body-std">
+            <div id="lockModalIcon" style="font-size: 50px; margin-bottom: 20px; text-align: center;">🔒</div>
+            <p id="lockModalText" style="font-size: 1.1rem; color: #334155; line-height: 1.5; text-align: center;">Are you sure you want to perform this action?</p>
+            
+            <div id="passwordFieldContainer" style="display: none; margin-top: 20px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #475569;">Administrator Password:</label>
+                <input type="password" id="lockAdminPassword" class="form-input" placeholder="Enter password to confirm unlock" style="width: 100%; padding: 12px; border: 1.5px solid #e2e8f0; border-radius: 8px;">
+            </div>
+
+            <input type="hidden" id="lockModalExamId">
+            <input type="hidden" id="lockModalIsLocked">
+        </div>
+        <div class="modal-footer-std">
+            <button type="button" class="btn-std btn-secondary close-global-modal">Cancel</button>
+            <button type="button" class="btn-std btn-primary" id="confirmLockBtn">Confirm Action</button>
+        </div>
+    </div>
+</div>
+
+<!-- Lock Alert Modal -->
+<div id="lockAlertModal" class="global-modal-backdrop">
+    <div class="global-modal-content narrow">
+        <div class="modal-header-std" style="background: #fff1f2; border-bottom-color: #fecaca;">
+            <h2 style="color: #be123c;">🔒 Examination Locked</h2>
+            <button type="button" class="close-global-modal">&times;</button>
+        </div>
+        <div class="modal-body-std text-center">
+            <div style="font-size: 50px; margin-bottom: 20px;">🚫</div>
+            <p id="lockAlertText" style="font-size: 1.1rem; color: #334155; line-height: 1.5;">This examination is locked. Please contact the <strong>Database Administrator</strong> for any required changes.</p>
+            <div id="lockAuditInfo" style="margin-top: 15px; font-size: 0.9rem; color: #64748b; font-style: italic;"></div>
+        </div>
+        <div class="modal-footer-std">
+            <button type="button" class="btn-std btn-secondary close-global-modal" style="width: 100%;">Close</button>
+        </div>
+    </div>
 </div>
 {% endblock %}

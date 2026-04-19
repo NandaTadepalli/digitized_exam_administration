@@ -18,19 +18,27 @@ def ajax_check_exam_publishable(request):
         data = json.loads(request.body.decode('utf-8'))
         exam_id = data.get('exam_id')
         if not exam_id:
-            return JsonResponse({'all_completed': False, 'published': False, 'error': 'Missing exam_id'})
+            return JsonResponse({'all_completed': False, 'published': False, 'is_locked': False, 'error': 'Missing exam_id'})
         exam = Examinations.objects.filter(id=exam_id).first()
         if not exam:
-            return JsonResponse({'all_completed': False, 'published': False, 'error': 'Exam not found'})
+            return JsonResponse({'all_completed': False, 'published': False, 'is_locked': False, 'error': 'Exam not found'})
+        
         slots = ExamSlot.objects.filter(examination=exam)
-        all_completed = True
+        all_completed = slots.exists()
         for slot in slots:
-            seating_count = SeatingPlan.objects.filter(exam_slot=slot).count()
-            invigilation_count = InvigilationDuty.objects.filter(exam_slot=slot).count()
-            if not slot.is_generated or seating_count == 0 or invigilation_count == 0:
+            # Check seating plan completion via workflow
+            from .models import SlotWorkflow
+            workflow = SlotWorkflow.objects.filter(exam_slot=slot).first()
+            if not workflow or not workflow.seating_step:
                 all_completed = False
                 break
-        return JsonResponse({'all_completed': all_completed, 'published': exam.published})
+        
+        return JsonResponse({
+            'all_completed': all_completed, 
+            'published': exam.published, 
+            'is_locked': exam.is_locked,
+            'locked_by': exam.locked_by.username if exam.locked_by else None
+        })
     except Exception as e:
         return JsonResponse({'all_completed': False, 'published': False, 'error': str(e)})
 
@@ -42,25 +50,96 @@ def ajax_publish_exam(request):
     try:
         data = json.loads(request.body.decode('utf-8'))
         exam_id = data.get('exam_id')
-        if not exam_id:
-            return JsonResponse({'success': False, 'error': 'Missing exam_id.'})
         exam = Examinations.objects.filter(id=exam_id).first()
         if not exam:
             return JsonResponse({'success': False, 'error': 'Examination not found.'})
+        
+        if exam.is_locked:
+            return JsonResponse({'success': False, 'error': 'Examination is locked. Please contact DB Admin.'})
+
         slots = ExamSlot.objects.filter(examination=exam)
         if not slots.exists():
-            exam.published = False
-            exam.save()
             return JsonResponse({'success': False, 'error': 'No slots found for this exam.'})
-        all_generated = all([slot.is_generated for slot in slots])
-        if all_generated:
+        
+        # Verify all slots have seating plans
+        from .models import SlotWorkflow
+        all_completed = all([SlotWorkflow.objects.filter(exam_slot=s, seating_step=True).exists() for s in slots])
+        
+        if all_completed:
             exam.published = True
             exam.save()
             return JsonResponse({'success': True})
         else:
-            exam.published = False
-            exam.save()
-            return JsonResponse({'success': False, 'error': 'Not all slots have generated seating plan.'})
+            return JsonResponse({'success': False, 'error': 'Some slots are still incomplete.'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+# AJAX endpoint to unpublish an examination
+@csrf_exempt
+def ajax_unpublish_exam(request):
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Invalid request method.'})
+    try:
+        data = json.loads(request.body.decode('utf-8'))
+        exam_id = data.get('exam_id')
+        exam = Examinations.objects.filter(id=exam_id).first()
+        if not exam:
+            return JsonResponse({'success': False, 'error': 'Examination not found.'})
+        
+        if exam.is_locked:
+            return JsonResponse({'success': False, 'error': 'Examination is locked. Please contact DB Admin.'})
+
+        exam.published = False
+        exam.save()
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+# AJAX endpoint to lock an examination
+@csrf_exempt
+def ajax_lock_exam(request):
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Invalid request method.'})
+    try:
+        data = json.loads(request.body.decode('utf-8'))
+        exam_id = data.get('exam_id')
+        exam = Examinations.objects.filter(id=exam_id).first()
+        if not exam:
+            return JsonResponse({'success': False, 'error': 'Examination not found.'})
+        
+        exam.is_locked = True
+        exam.locked_by = request.user
+        exam.lock_updated_at = timezone.now()
+        exam.save()
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+# AJAX endpoint to unlock an examination (Superusers only)
+@csrf_exempt
+def ajax_unlock_exam(request):
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Invalid request method.'})
+    try:
+        if not request.user.is_superuser:
+            return JsonResponse({'success': False, 'error': 'Only Superusers (DB Admins) can unlock an examination.'})
+            
+        data = json.loads(request.body.decode('utf-8'))
+        exam_id = data.get('exam_id')
+        password = data.get('password')
+        
+        if not request.user.check_password(password):
+            return JsonResponse({'success': False, 'error': 'Incorrect password. Unlock denied.'})
+            
+        exam = Examinations.objects.filter(id=exam_id).first()
+        if not exam:
+            return JsonResponse({'success': False, 'error': 'Examination not found.'})
+        
+        exam.is_locked = False
+        exam.locked_by = request.user
+        exam.lock_updated_at = timezone.now()
+        exam.save()
+        return JsonResponse({'success': True})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
 
@@ -145,9 +224,9 @@ def ajax_edit_examination(request):
         exam_id = data.get('exam_id')
         if not exam_id:
             return JsonResponse({'success': False, 'error': 'Missing exam_id.'})
-        exam = Examinations.objects.filter(id=exam_id).first()
-        if not exam:
-            return JsonResponse({'success': False, 'error': 'Examination not found.'})
+        exam = Examinations.objects.get(id=exam_id)
+        if exam.is_locked:
+            return JsonResponse({'success': False, 'error': 'Examination is locked. Please contact DB Admin.'})
         
         exam.exam_name = data.get('examname', '').strip()
         exam.academic_year = data.get('academic_year', '').strip()
@@ -170,9 +249,12 @@ def ajax_delete_examination(request):
         exam_id = data.get('exam_id')
         with transaction.atomic():
             if slot_id:
-                slot = ExamSlot.objects.filter(id=slot_id).first()
+                slot = ExamSlot.objects.filter(id=slot_id).select_related('examination').first()
                 if not slot:
                     return JsonResponse({'success': False, 'error': 'Slot not found.'})
+                if slot.examination and slot.examination.is_locked:
+                    return JsonResponse({'success': False, 'error': 'Examination is locked. Please contact DB Admin.'})
+                
                 exams = Exam.objects.filter(exam_slot=slot)
                 for ex in exams:
                     StudentExamMap.objects.filter(exam=ex).delete()
@@ -183,6 +265,9 @@ def ajax_delete_examination(request):
                 exam = Examinations.objects.filter(id=exam_id).first()
                 if not exam:
                     return JsonResponse({'success': False, 'error': 'Examination not found.'})
+                if exam.is_locked:
+                    return JsonResponse({'success': False, 'error': 'Examination is locked. Please contact DB Admin.'})
+                
                 slots = ExamSlot.objects.filter(examination=exam)
                 for slot in slots:
                     exams = Exam.objects.filter(exam_slot=slot)
@@ -216,15 +301,43 @@ def ajax_exam_slots(request):
             exams = Exam.objects.filter(exam_slot=slot)
             course_count = exams.count()
             student_count = StudentExamMap.objects.filter(exam__in=exams).count() if course_count else 0
-            assignment_status = "Assigned" if course_count else "Pending"
+            # Use SlotWorkflow or calculate and sync
+            from .models import SlotWorkflow
+            workflow, created = SlotWorkflow.objects.get_or_create(exam_slot=slot)
+            
+            # Sync counts to workflow only ONCE when record is created (Initial catch-up)
+            if created:
+                modified = False
+                if course_count > 0:
+                    workflow.courses_step = True
+                    modified = True
+                if RoomAllocation.objects.filter(exam_slot=slot).exists():
+                    workflow.rooms_step = True
+                    modified = True
+                if FacultyAvailability.objects.filter(exam_slot=slot, is_active=True).exists():
+                    workflow.faculty_step = True
+                    modified = True
+                if SeatingPlan.objects.filter(exam_slot=slot).exists():
+                    workflow.seating_step = True
+                    modified = True
+                if modified:
+                    workflow.save()
+
+            assignment_status = "Assigned" if workflow.courses_step else "Pending"
             assigned_room_count = RoomAllocation.objects.filter(exam_slot=slot).count()
             assigned_faculty_count = FacultyAvailability.objects.filter(exam_slot=slot, is_active=True).count()
             
-            is_generated = slot.is_generated
-            seating_count = SeatingPlan.objects.filter(exam_slot=slot).count()
-            invigilation_count = InvigilationDuty.objects.filter(exam_slot=slot).count()
-            if is_generated and (seating_count == 0 or invigilation_count == 0):
-                is_generated = False
+            is_generated = workflow.seating_step
+            # Physical Record Verification (User Request)
+            # Even if seating_step is True, verify counts match
+            actual_seating_count = SeatingPlan.objects.filter(exam_slot=slot).count()
+            
+            if is_generated:
+                # If seating plan exists but student count has changed, revert status
+                if actual_seating_count < student_count or student_count == 0:
+                    is_generated = False
+                    workflow.seating_step = False
+                    workflow.save()
                 
             all_assigned = True if is_generated else False
             status = 'Publish' if is_generated and all_assigned else 'Pending'
@@ -240,12 +353,17 @@ def ajax_exam_slots(request):
                 'registration_type': slot.registration_type,
                 'assignment_status': assignment_status,
                 'course_count': course_count,
-                'student_count': student_count,
                 'assigned_room_count': assigned_room_count,
                 'assigned_faculty_count': assigned_faculty_count,
-                'is_generated': is_generated,
+                'student_count': student_count,
                 'all_assigned': all_assigned,
                 'status': status,
+                'is_generated': is_generated,
+                'courses_completed': workflow.courses_step,
+                'rooms_completed': workflow.rooms_step,
+                'faculty_completed': workflow.faculty_step,
+                'seating_completed': workflow.seating_step,
+                'updated_by': workflow.updated_by.username if workflow.updated_by else 'System'
             })
     return JsonResponse({'slots': slots})
 
@@ -274,9 +392,16 @@ def ajax_exam_scheduling_groups(request):
     exam_date_range = (slot.examination.start_date, slot.examination.end_date) if slot and slot.examination else None
     scheduled_courses = set()
     if exam_date_range:
-        slots_in_range = ExamSlot.objects.filter(examination=slot.examination, exam_date__gte=exam_date_range[0], exam_date__lte=exam_date_range[1])
-        exams_in_range = Exam.objects.filter(exam_slot__in=slots_in_range)
-        for exam in exams_in_range:
+        # Exclude the current slot when checking for already-scheduled courses
+        # This allows courses in the current slot to pass through and be marked as 'checked'
+        slots_in_range_others = ExamSlot.objects.filter(
+            examination=slot.examination, 
+            exam_date__gte=exam_date_range[0], 
+            exam_date__lte=exam_date_range[1]
+        ).exclude(id=slot_id)
+        
+        exams_in_range_others = Exam.objects.filter(exam_slot__in=slots_in_range_others)
+        for exam in exams_in_range_others:
             if exam.course: scheduled_courses.add((exam.course.course_code, exam.course.course_name))
 
     groups = reg_qs.values('course__course_code', 'course__course_name', 'student__batch__batch_code', 'academic_year', 'semester', 'registration_type', 'student_id')
@@ -297,20 +422,32 @@ def ajax_exam_scheduling_groups(request):
         group['student_ids'].append(str(reg['student_id']))
         
     scheduled_student_ids = set()
+    exams_in_this_slot = []
     if slot:
-        exams_in_slot = Exam.objects.filter(exam_slot=slot)
-        scheduled_student_ids = set(str(sid) for sid in StudentExamMap.objects.filter(exam__in=exams_in_slot).values_list('student_id', flat=True))
+        exams_in_this_slot = list(Exam.objects.filter(exam_slot=slot).values_list('course__course_code', 'regulation'))
+        exams_in_slot_objs = Exam.objects.filter(exam_slot=slot)
+        scheduled_student_ids = set(str(sid) for sid in StudentExamMap.objects.filter(exam__in=exams_in_slot_objs).values_list('student_id', flat=True))
 
     seen_keys = set()
     result = []
-    for group in group_map.values():
+    for key, group in group_map.items():
+        course_code, _, regulation, _, _, _ = key
         group['student_count'] = len(group['student_ids'])
         group_key = (group['course_code'], group['regulation'], group['academic_year'], group['semester'])
-        if any(str(sid) in scheduled_student_ids for sid in group['student_ids']): continue
-        if group_key in seen_keys: continue
+        
+        # Check if this group is already in THIS slot
+        is_already_here = (course_code, regulation) in exams_in_this_slot
+        group['is_already_scheduled'] = is_already_here
+        
+        # If it's already here, we MUST show it. 
+        # Otherwise, check if it's scheduled elsewhere
+        if not is_already_here:
+            if any(str(sid) in scheduled_student_ids for sid in group['student_ids']): continue
+            if group_key in seen_keys: continue
+        
         seen_keys.add(group_key)
         result.append(group)
-    result.sort(key=lambda g: g['student_count'], reverse=True)
+    result.sort(key=lambda g: g['is_already_scheduled'], reverse=True) # Show selected ones first
     return JsonResponse({'groups': result})
 
 # AJAX endpoint to get filters for exam portal
