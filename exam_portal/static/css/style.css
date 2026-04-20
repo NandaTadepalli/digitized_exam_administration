@@ -2702,6 +2702,20 @@ table tbody tr td li {
     animation: timerPulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+.timer-safe {
+    color: #10b981 !important;
+}
+
+.timer-critical {
+    color: #ef4444 !important;
+    animation: timer-flicker 0.8s infinite;
+}
+
+@keyframes timer-flicker {
+    0%, 100% { opacity: 1; text-shadow: 0 0 8px rgba(239, 68, 68, 0.2); }
+    50% { opacity: 0.7; text-shadow: 0 0 12px rgba(239, 68, 68, 0.5); }
+}
+
 @keyframes timerPulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
@@ -2733,28 +2747,34 @@ table tbody tr td li {
 }
 
 .btn-glass {
-    background: #f1f5f9 !important;
-    color: #475569 !important;
-}
-
-.btn-glass:hover { background: #e2e8f0 !important; }
-
-.btn-premium {
-    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+    background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%) !important;
     color: #fff !important;
     box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
 }
 
-.btn-premium:hover {
+.btn-glass:hover { 
     transform: translateY(-1px);
     box-shadow: 0 6px 16px rgba(37, 99, 235, 0.3);
 }
 
-.btn-premium:disabled {
-    background: #e2e8f0 !important;
+.btn-premium {
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%) !important;
+    color: #fff !important;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+}
+
+.btn-premium:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.3);
+}
+
+.btn-premium:disabled, .btn.disabled {
+    background: #f1f5f9 !important;
     color: #94a3b8 !important;
     box-shadow: none;
     cursor: not-allowed;
+    border: 1px solid #e2e8f0 !important;
+    opacity: 1 !important;
 }
 
 /* Attendance Marking System (Lighter Version) */

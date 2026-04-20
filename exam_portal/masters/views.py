@@ -92,26 +92,20 @@ def invigilation_duties(request):
                 delay_mins = 10
         
         open_iso = (datetime.combine(exam_date, start_time) + timedelta(minutes=delay_mins)).isoformat() if exam_date and start_time else ""
-        deadline_iso = (datetime.combine(exam_date, start_time) + timedelta(minutes=30)).isoformat() if exam_date and start_time else ""
+        deadline_iso = (datetime.combine(exam_date, start_time) + timedelta(minutes=delay_mins + 30)).isoformat() if exam_date and start_time else ""
 
         now = datetime.now()
         exam_start = datetime.combine(exam_date, start_time)
         exam_end = datetime.combine(exam_date, end_time)
-        exam_start_30m = exam_start + timedelta(minutes=30)
         exam_start_delay = exam_start + timedelta(minutes=delay_mins)
+        exam_start_30m = exam_start_delay + timedelta(minutes=30)
 
-        att_status = 'UPCOMING'
         if now < exam_start:
             att_status = 'UPCOMING'
-        elif now > exam_end:
-            att_status = 'COMPLETED'
+        elif now <= exam_end:
+            att_status = 'ONGOING'
         else:
-            if now < exam_start_delay:
-                att_status = 'WAITING'
-            elif now <= exam_start_30m:
-                att_status = 'ACTIVE'
-            else:
-                att_status = 'PENDING'
+            att_status = 'COMPLETED'
 
         duties.append({
             'exam_name': exam_name,
@@ -189,7 +183,7 @@ def facultyview_seatingplan(request):
             delay_mins = 10
             
         open_iso = (datetime.combine(exam_date, start_time) + timedelta(minutes=delay_mins)).isoformat() if exam_date and start_time else ""
-        deadline_iso = (datetime.combine(exam_date, start_time) + timedelta(minutes=30)).isoformat() if exam_date and start_time else ""
+        deadline_iso = (datetime.combine(exam_date, start_time) + timedelta(minutes=delay_mins + 30)).isoformat() if exam_date and start_time else ""
 
         # Attendance Status Logic
         has_posted = Attendance.objects.filter(
@@ -201,44 +195,47 @@ def facultyview_seatingplan(request):
         now = datetime.now()
         exam_start = datetime.combine(exam_date, start_time)
         exam_end = datetime.combine(exam_date, end_time)
-        exam_start_30m = exam_start + timedelta(minutes=30)
         exam_start_delay = exam_start + timedelta(minutes=delay_mins)
-
-        att_status = 'UPCOMING'
-        att_label = 'Mark Attendance'
-        btn_class = 'btn-secondary disabled'
-        can_click = False
+        exam_start_30m = exam_start_delay + timedelta(minutes=30)
 
         if now < exam_start:
             att_status = 'UPCOMING'
             att_label = 'Upcoming'
-        elif now > exam_end:
-            att_status = 'MARKED' if has_posted else 'COMPLETED'
-            att_label = 'View Attendance'
-            btn_class = 'btn-info'
-            can_click = True
-        else:
+        elif now <= exam_end:
+            att_status = 'ONGOING'
             if has_posted:
-                att_status = 'MARKED'
                 att_label = 'Edit Attendance'
                 btn_class = 'btn-warning'
                 can_click = True
+            elif now < exam_start_delay:
+                att_label = 'Opening Soon'
+                btn_class = 'btn-secondary disabled'
+                can_click = False
+            elif now <= exam_start_30m:
+                att_label = 'Mark Attendance'
+                btn_class = 'btn-secondary'
+                can_click = True
             else:
-                if now < exam_start_delay:
-                    att_status = 'WAITING'
-                    att_label = 'Ready Soon'
-                    btn_class = 'btn-secondary disabled'
-                    can_click = False
-                elif now <= exam_start_30m:
-                    att_status = 'ACTIVE'
-                    att_label = 'Mark Attendance'
-                    btn_class = 'btn-secondary'
-                    can_click = True
-                else:
-                    att_status = 'PENDING'
-                    att_label = 'Window Closed'
-                    btn_class = 'btn-danger disabled'
-                    can_click = False
+                att_status = 'PENDING'
+                att_label = 'Window Closed'
+                btn_class = 'btn-danger disabled'
+                can_click = False
+        else:
+            att_status = 'COMPLETED'
+            att_label = 'View Attendance'
+            btn_class = 'btn-info'
+            can_click = True
+
+        # Override can_click if window missed
+        if now > exam_start_30m:
+             if has_posted:
+                 att_label = 'View Attendance'
+                 btn_class = 'btn-info'
+                 can_click = True
+             else:
+                 can_click = False
+                 att_label = 'Window Closed'
+                 btn_class = 'btn-danger disabled'
 
         duties.append({
             'exam_name': exam_name,

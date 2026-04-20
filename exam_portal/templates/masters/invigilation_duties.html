@@ -6,12 +6,12 @@
     <div class="exam-cards-wrapper">
         {% if duties %}
         {% for duty in duties %}
-        <div class="exam-card {% if duty.attendance_status == 'UPCOMING' %}upcoming{% elif duty.attendance_status == 'ACTIVE' or duty.attendance_status == 'WAITING' or duty.attendance_status == 'MARKED' %}active{% elif duty.attendance_status == 'PENDING' %}deadline{% endif %}">
+        <div class="exam-card {% if duty.attendance_status == 'UPCOMING' %}upcoming{% elif duty.attendance_status == 'ONGOING' %}active{% elif duty.attendance_status == 'COMPLETED' %}deadline{% endif %}">
             <div class="exam-card-header">
                 <h2 class="exam-name">{{ duty.exam_name }}</h2>
-                <div class="status-pill {% if duty.attendance_status == 'MARKED' or duty.attendance_status == 'COMPLETED' %}active{% elif duty.attendance_status == 'UPCOMING' %}upcoming{% elif duty.attendance_status == 'PENDING' %}deadline{% else %}active{% endif %}">
+                <div class="status-pill {% if duty.attendance_status == 'COMPLETED' %}deadline{% elif duty.attendance_status == 'UPCOMING' %}upcoming{% else %}active{% endif %}">
                     <span class="live-dot"></span> 
-                    {% if duty.attendance_status == 'PENDING' %}Pending{% elif duty.attendance_status == 'MARKED' %}Marked{% else %}{{ duty.attendance_status }}{% endif %}
+                    {{ duty.attendance_status }}
                 </div>
             </div>
             
@@ -40,9 +40,9 @@
                     </span>
                 </div>
 
-                <!-- Ultra-Premium Timer Ribbon -->
+                <!-- Advanced Timer Ribbon -->
                 <div class="timer-ribbon">
-                    <span class="timer-label" id="timer-label-{{ forloop.index }}">--</span>
+                    <span class="timer-label" id="timer-label-{{ forloop.index }}">Syncing...</span>
                     <span class="timer-clock" id="timer-clock-{{ forloop.index }}" 
                           data-start="{{ duty.start_iso }}" 
                           data-open="{{ duty.open_iso }}" 
@@ -54,7 +54,7 @@
 
             <div class="exam-card-footer">
                 <a href="{% url 'operations:seatingplan' %}?slot_id={{ duty.exam_slot_id }}&room_id={{ duty.room_id }}"
-                    class="btn btn-premium">View Specific Details</a>
+                    class="btn btn-glass">View Specific Details</a>
             </div>
         </div>
         {% endfor %}
@@ -68,7 +68,7 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        // --- Ultra-Premium Timer Logic ---
+        // --- Advanced Timer Engine ---
         function updateAllTimers() {
             const clocks = document.querySelectorAll('.timer-clock');
             const now = new Date();
@@ -79,23 +79,33 @@
                 const deadline = new Date(clock.getAttribute('data-deadline'));
                 const label = document.getElementById('timer-label-' + clock.id.split('-').pop());
 
-                let targetDate, labelText, isPulse = false;
+                let targetDate, labelText, timerClass = "";
+
+                // Reset
+                clock.classList.remove('timer-safe', 'timer-critical', 'pulse');
+                clock.style.display = 'inline-block';
 
                 if (now < start) {
                     targetDate = start;
-                    labelText = "Exam Starts";
+                    labelText = "Starts in:";
                 } else if (now < open) {
                     targetDate = open;
-                    labelText = "⏳ To start marking attendance";
-                    isPulse = true;
+                    labelText = "⏳ Attendance will open in:";
+                    clock.classList.add('pulse');
                 } else if (now < deadline) {
                     targetDate = deadline;
-                    labelText = "Post by";
-                    isPulse = true;
+                    labelText = "Mark Attendance in:";
+                    const diffMs = deadline - now;
+                    if (diffMs <= 5 * 60 * 1000) {
+                        timerClass = "timer-critical";
+                    } else {
+                        timerClass = "timer-safe";
+                    }
                 } else {
-                    clock.innerText = "00:00:00";
-                    label.innerText = "⏳ Attendance not marked";
-                    clock.classList.remove('pulse');
+                    // Note: Here we don't have has-posted but it's okay for this view
+                    labelText = "⏳ Attendance window closed. Contact Controller of Exam for further process.";
+                    label.innerText = labelText;
+                    clock.style.display = 'none';
                     return;
                 }
 
@@ -106,8 +116,7 @@
 
                 clock.innerText = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
                 label.innerText = labelText;
-                if (isPulse) clock.classList.add('pulse');
-                else clock.classList.remove('pulse');
+                if (timerClass) clock.classList.add(timerClass);
             });
         }
 

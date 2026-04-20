@@ -16,7 +16,7 @@
     </div>
 </div>
 
-<form method="POST" action="{% url 'operations:mark_attendance' %}?slot_id={{ slot.id }}&room_id={{ room.id }}">
+<form id="attendanceSubmitForm" method="POST" action="{% url 'operations:mark_attendance' %}?slot_id={{ slot.id }}&room_id={{ room.id }}&partial=1">
     {% csrf_token %}
     <div class="att-table-scroll">
         <table class="att-table-base">

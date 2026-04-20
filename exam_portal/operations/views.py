@@ -129,6 +129,12 @@ def mark_attendance(request):
             end = start + per_faculty
             my_students = seating[start:end]
 
+    # Sort my_students so similar subjects are grouped together
+    my_students = sorted(
+        my_students, 
+        key=lambda x: str(x.student_exam.exam.course.course_code if x.student_exam.exam and x.student_exam.exam.course else '')
+    )
+
     # --- Time-Based Constraint Logic ---
     from datetime import datetime, timedelta
     now = datetime.now()
@@ -137,16 +143,25 @@ def mark_attendance(request):
     end_time = slot.end_time
     exam_start = datetime.combine(exam_date, start_time)
     exam_end = datetime.combine(exam_date, end_time)
-    exam_start_30m = exam_start + timedelta(minutes=30)
+    
+    # Calculate buffer delay identically to dashboard
+    delay_mins = 5
+    if start_time and end_time:
+        duration_hours = (exam_end - exam_start).total_seconds() / 3600
+        if duration_hours >= 2.5:
+            delay_mins = 10
+            
+    exam_start_delay = exam_start + timedelta(minutes=delay_mins)
+    exam_start_30m = exam_start_delay + timedelta(minutes=30)
 
     # Check if this faculty has already posted for this slot/room
     has_posted = Attendance.objects.filter(marked_by=faculty, student_exam__exam__exam_slot=slot, room=room).exists()
 
     read_only = False
-    if now > exam_end:
+    if now > exam_start_30m:
         read_only = True
         if request.method == 'POST':
-            return JsonResponse({'success': False, 'error': 'Exam has ended. Transcription is no longer allowed.'})
+            return JsonResponse({'success': False, 'error': 'Exam attendance window has closed. Editing is no longer allowed.'})
     
     if request.method == 'POST':
         # Enforce the 30-minute rule for first-time posting
@@ -160,6 +175,7 @@ def mark_attendance(request):
         # Process attendance
         total_present = 0
         total_absent = 0
+        absentees_list = []
         
         for student_plan in my_students:
             student_exam = student_plan.student_exam
@@ -171,6 +187,11 @@ def mark_attendance(request):
                 total_present += 1
             else:
                 total_absent += 1
+                fname = student_exam.student.std_name if hasattr(student_exam.student, 'std_name') else ''
+                absentees_list.append({
+                    'id': student_exam.student.student_id,
+                    'name': fname
+                })
 
             Attendance.objects.update_or_create(
                 student_exam=student_exam,
@@ -183,9 +204,10 @@ def mark_attendance(request):
         if request.GET.get('partial') == '1':
             return JsonResponse({
                 'success': True,
-                'message': f"Attendance marked for {slot.examination.exam_name} - {slot.slot_code}",
+                'message': f"Attendance Posted Successfully",
                 'present': total_present,
                 'absent': total_absent,
+                'absentees': absentees_list,
                 'room_code': room.room_code,
                 'exam_time': f"{slot.start_time.strftime('%I:%M %p')} - {slot.end_time.strftime('%I:%M %p')}"
             })
@@ -206,6 +228,7 @@ def mark_attendance(request):
         'attendance_data': attendance_data,
         'base_template': "core/base_faculty.html",
         'partial': partial,
+        'read_only': read_only,
     })
 
 def room_alloc_view(request):
